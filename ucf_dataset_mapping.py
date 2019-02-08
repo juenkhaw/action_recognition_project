@@ -38,7 +38,7 @@ for i in range(3):
     
     for index in range(len(ucf_train_str) - 1):
         buffer = ucf_train_str[index].split(' ')
-        train_list_str += (buffer[0].split('/')[1] + ' ' + buffer[1] + '\n')
+        train_list_str += (buffer[0].split('/')[1] + ' ' + str(int(buffer[1]) - 1) + '\n')
     
     fo_ucf_train_list.write(train_list_str)
     fo_ucf_train_list.close()
@@ -52,7 +52,7 @@ for i in range(3):
     fo_ucf_test_list = open(ucf_directory/out_file_path, 'w')
     ucf_test_str = fo_ucf_test.read().split('\n')
     
-    # saving train_list into a file, based on the split
+    # saving test_list into a file, based on the split
     # format ## trimmed video_name label_index ##
     
     for index in range(len(ucf_test_str) - 1):
