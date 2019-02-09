@@ -8,6 +8,7 @@ Created on Mon Feb  4 16:09:32 2019
 import os
 from pathlib import Path
 import numpy as np
+import random
 
 from torch.utils.data import Dataset
 
@@ -22,9 +23,10 @@ class VideoDataset(Dataset):
         modelity : [rgb / flow]
         clip_len : [8 / 16] Target depth of training/testing clips
         test_mode : Activates to run on small samples to verify the correctness of implementation
+        test_amt : Amount of labelled samples to be used if test_mode is activated
     """
     
-    def __init__(self, dataset, split, mode, modality, clip_len = 16, test_mode = True):
+    def __init__(self, dataset, split, mode, modality, clip_len = 16, test_mode = True, test_amt = 8):
         
         # declare the parameters chosen as described in R(2+1)D papers
         self._resize_height = 128
@@ -85,6 +87,14 @@ class VideoDataset(Dataset):
         # convert the labels list into an np array
         self._labels = np.array([label for label in labels], dtype = np.int)
         
+        # implement test mode to extremely scale down the dataset
+        if test_mode:
+            indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
+            self._clip_names = (np.array(self._clip_names))[indices]
+            self._labels = self._labels[indices]
+            #for i in range(test_amt):
+            #    print(self._clip_names[i], self._labels[i])
+        
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
         buffer = video_module.load_video(self._clip_names[index], self._modality, 
@@ -98,4 +108,4 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('ucf', 0, 'train', 'rgb')
+    test = VideoDataset('ucf', 0, 'train', 'flow', test_mode = 'True')
