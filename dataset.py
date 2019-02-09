@@ -47,15 +47,15 @@ class VideoDataset(Dataset):
         if dataset == 'ucf':
             main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'ucf101_jpegs_256\jpegs_256')
+                frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
             else:
-                frame_dir = Path(main_dir/'ucf101_tvl1_flow\tvl1_flow')
+                frame_dir = Path(main_dir/'ucf101_tvl1_flow'/'tvl1_flow')
         else:
             main_dir = Path(r'..\dataset\HMDB-51')
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'hmdb51_jpegs_256\jpegs_256')
+                frame_dir = Path(main_dir/'hmdb51_jpegs_256'/'jpegs_256')
             else:
-                frame_dir = Path(main_dir/'hmdb51_tvl1_flow\tvl1_flow')
+                frame_dir = Path(main_dir/'hmdb51_tvl1_flow'/'tvl1_flow')
             
         if split == 0:
             for i in range(3):
@@ -74,7 +74,12 @@ class VideoDataset(Dataset):
         self._clip_names, labels = [], []
         for i in range(len(buffer_str)):
             buffer_map = buffer_str[i].split(' ')
-            self._clip_names.append(os.path.join(frame_dir, buffer_map[0].split('.')[0]))
+            self._clip_names.append([])
+            if self._modality == 'rgb':
+                self._clip_names[i].append(os.path.join(frame_dir, buffer_map[0].split('.')[0]))
+            else:
+                self._clip_names[i].append(os.path.join(frame_dir, 'u', buffer_map[0].split('.')[0]))
+                self._clip_names[i].append(os.path.join(frame_dir, 'v', buffer_map[0].split('.')[0]))
             labels.append(buffer_map[1])
         
         # convert the labels list into an np array
@@ -93,4 +98,4 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('hmdb', 0, 'train', 'rgb')
+    test = VideoDataset('ucf', 0, 'train', 'rgb')
