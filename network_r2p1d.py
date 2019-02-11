@@ -129,8 +129,8 @@ class R2Plus1DNet(nn.Module):
         'Predictions',
     )
     
-    def __init__(self, layer_sizes, num_classes, block_type = SpatioTemporalResBlock, 
-                 in_channels = 3, final_endpoint = 'Logits', name = 'R2+1D'):
+    def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
+                 in_channels = 3, final_endpoint = 'Logits', name = 'R2+1D', verbose = 'True'):
         
         if final_endpoint not in self.VALID_ENDPOINTS:
             raise ValueError('Unknown final endpoint %s' % final_endpoint)
@@ -139,27 +139,28 @@ class R2Plus1DNet(nn.Module):
         
         self._num_classes = num_classes
         self._final_endpoint = final_endpoint
+        self._verbose = verbose
         self.end_points = {}
         
         # Conv3d_1_3x7x7
         self.end_points[self.VALID_ENDPOINTS[0]] = SpatioTemporalConv(in_channels, 64, kernel_size = (3, 7, 7), 
-                       stride = (1, 2, 2), padding = 'SAME', name = name + self.VALID_ENDPOINTS[0])
+                       stride = (1, 2, 2), padding = 'SAME', name = name + self.VALID_ENDPOINTS[0]).to(device)
         
         # Conv3d_2_x
         self.end_points[self.VALID_ENDPOINTS[1]] = SpatioTemporalResModule(64, 64, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[0], downsample = False, name = name + self.VALID_ENDPOINTS[1])
+                       layer_size = layer_sizes[0], downsample = False, name = name + self.VALID_ENDPOINTS[1]).to(device)
         
         # Conv3d_3_x
         self.end_points[self.VALID_ENDPOINTS[2]] = SpatioTemporalResModule(64, 128, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[1], downsample = True, name = name + self.VALID_ENDPOINTS[2])
+                       layer_size = layer_sizes[1], downsample = True, name = name + self.VALID_ENDPOINTS[2]).to(device)
         
         # Conv3d_4_x
         self.end_points[self.VALID_ENDPOINTS[3]] = SpatioTemporalResModule(128, 256, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[2], downsample = True, name = name + self.VALID_ENDPOINTS[3])
+                       layer_size = layer_sizes[2], downsample = True, name = name + self.VALID_ENDPOINTS[3]).to(device)
         
         # Conv3d_5_x
         self.end_points[self.VALID_ENDPOINTS[4]] = SpatioTemporalResModule(256, 512, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[3], downsample = True, name = name + self.VALID_ENDPOINTS[4])
+                       layer_size = layer_sizes[3], downsample = True, name = name + self.VALID_ENDPOINTS[4]).to(device)
         
         # Logits
         self.pool = nn.AdaptiveAvgPool3d(1)
@@ -173,11 +174,13 @@ class R2Plus1DNet(nn.Module):
     def forward(self, x):
         
         # perform each module until reaching final endpoint
-        print('input', x.shape)
+        if self._verbose:
+            print('input', x.shape)
         for end_point in self.VALID_ENDPOINTS:
             if end_point in self.end_points.keys():
                 x = self.end_points[end_point](x)
-                print(end_point, x.shape)
+                if self._verbose:
+                    print(end_point, x.shape)
                 if end_point is self._final_endpoint:
                     break
         
@@ -194,8 +197,17 @@ class R2Plus1DNet(nn.Module):
         
 
 if __name__ is '__main__':
+    device = torch.device('cpu')
+    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2).to(device)
+
+    x = torch.randn((1, 2, 8, 112, 112)).to(device)
     
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101)
-    x = torch.randn((1, 3, 16, 112, 112))
-    
-    model(x)
+    try:
+        model(x)
+    except RuntimeError as e:
+        pass
+        if 'out of memory' in str(e):
+            for p in model.parameters():
+                if p.grad is not None:
+                    del p.grad
+            torch.cuda.empty_cache()

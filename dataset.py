@@ -19,7 +19,7 @@ class VideoDataset(Dataset):
     Constructor of this class requires:
         dataset : [ucf / hmdb]
         split : [0/1/2/3] where 0 indicates loading all dataset at once
-        mode : [train / test] Special notes: [val] option to be implemented in future
+        mode : [train / test]
         modelity : [rgb / flow]
         clip_len : [8 / 16] Target depth of training/testing clips
         test_mode : Activates to run on small samples to verify the correctness of implementation
@@ -108,4 +108,5 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('ucf', 0, 'train', 'flow', test_mode = 'True')
+    test = VideoDataset('hmdb', 0, 'train', 'rgb', test_mode = True, test_amt = 1)
+    print(test.__len__())
