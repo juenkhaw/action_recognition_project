@@ -8,6 +8,7 @@ Created on Sat Jan 26 22:58:13 2019
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import torch.nn.init as init
 
 class Conv3D(nn.Module):
     
@@ -92,26 +93,24 @@ class MaxPool3DSame(nn.MaxPool3d):
             
         return super(MaxPool3DSame, self).forward(x)
     
-def model_summary(net):
-    for end in net.VALID_ENDPOINTS:
-        if end in net.end_points.keys():
-            module = net.end_points[end]
-            if isinstance(module, nn.Module):
-                print(module)
-    print(net)
-    
 def msra_init(net):
-    for end in net.VALID_ENDPOINTS:
-        if end in net.end_points.keys():
-            module = net.end_points[end]
-            if isinstance(module, nn.Module):
-                for m in module.modules():
-                    if isinstance(m, nn.Conv3d):
-                        print(m)
-                    elif isinstance(m, nn.BatchNorm3d):
-                        print(m)
-                    elif isinstance(m, nn.Linear):
-                        print(m)
+    #count = [0, 0, 0]
+    for module in net.modules():
+        if isinstance(module, nn.Conv3d):
+            #count[0] += 1
+            init.kaiming_normal_(module.weight)
+            if module.bias is not None:
+                init.constant_(module.bias, 0)
+        elif isinstance(module, nn.BatchNorm3d):
+            #count[1] += 1
+            init.constant_(module.weight, 1)
+            init.constant_(module.bias, 0)
+        elif isinstance(module, nn.Linear):
+            #count[2] += 1
+            init.normal_(module.weight, std = 1e-3)
+            if module.bias is not None:
+                init.constant_(module.bias, 0)
+    #print(count)
     
 if __name__ is '__main__':
     

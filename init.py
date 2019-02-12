@@ -14,6 +14,7 @@ from torch.utils.data import DataLoader
 
 from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
+from module import msra_init
 
 parser = argparse.ArgumentParser(description = 'PyTorch 2.5D Action Recognition ResNet')
 
@@ -52,7 +53,6 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 
-
 ########### DATALOADER TESTING ZONE
 #dataset = VideoDataset(args.dataset, args.split, 'train', args.modality, 
 #                       clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt)
@@ -64,9 +64,12 @@ in_channels = {'rgb' : 3, 'flow' : 2}
 #print(x.shape)
 ###########
 
+# initialize the model
 model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                     in_channels = in_channels[args.modality], verbose = args.verbose1, 
                     bn_momentum = args.bn_momentum, bn_epson = args.bn_epson).to(device)
+# initialize the model parameters according to msra_fill initialization
+msra_init(model)
 
 # initialize loss function, optimizer, and scheduler
 criterion = nn.CrossEntropyLoss()
@@ -94,6 +97,7 @@ dataloaders = {'train': train_dataloader, 'val': val_dataloader}
 #print(train_dataloader.dataset._labels, val_dataloader.dataset._labels)
 #model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes, device, 
 #                    in_channels = in_channels[args.modality], verbose = False).to(device)
+msra_init(model)
 #############
 
 if args.verbose2:
