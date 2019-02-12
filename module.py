@@ -29,7 +29,7 @@ class Conv3D(nn.Module):
                                stride = self._stride, padding = (0, 0, 0), bias = use_bias)
         
         if use_BN:
-            self.bn1 = nn.BatchNorm3d(out_planes, eps=bn_eps, momentum=bn_mom)
+            self.bn1 = nn.BatchNorm3d(out_planes, eps = bn_eps, momentum = bn_mom)
         
     def compute_pad(self, dim, s):
         if s % self._stride[dim] == 0:
@@ -91,6 +91,27 @@ class MaxPool3DSame(nn.MaxPool3d):
         x = F.pad(x, pad)
             
         return super(MaxPool3DSame, self).forward(x)
+    
+def model_summary(net):
+    for end in net.VALID_ENDPOINTS:
+        if end in net.end_points.keys():
+            module = net.end_points[end]
+            if isinstance(module, nn.Module):
+                print(module)
+    print(net)
+    
+def msra_init(net):
+    for end in net.VALID_ENDPOINTS:
+        if end in net.end_points.keys():
+            module = net.end_points[end]
+            if isinstance(module, nn.Module):
+                for m in module.modules():
+                    if isinstance(m, nn.Conv3d):
+                        print(m)
+                    elif isinstance(m, nn.BatchNorm3d):
+                        print(m)
+                    elif isinstance(m, nn.Linear):
+                        print(m)
     
 if __name__ is '__main__':
     

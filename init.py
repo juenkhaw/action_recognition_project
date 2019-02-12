@@ -31,6 +31,8 @@ parser.add_argument('-gm', '--lr-decay', help = 'lr decaying rate', default = 0.
 parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
 parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
 parser.add_argument('-wn', '--worker-num', help = 'number of workers for some processes (safer to set at 0; -1 set as number of device)', default = 0, type = int)
+parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
+parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
 
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -63,7 +65,8 @@ in_channels = {'rgb' : 3, 'flow' : 2}
 ###########
 
 model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
-                    in_channels = in_channels[args.modality], verbose = args.verbose1).to(device)
+                    in_channels = in_channels[args.modality], verbose = args.verbose1, 
+                    bn_momentum = args.bn_momentum, bn_epson = args.bn_epson).to(device)
 
 # initialize loss function, optimizer, and scheduler
 criterion = nn.CrossEntropyLoss()
