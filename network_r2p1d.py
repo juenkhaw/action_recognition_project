@@ -53,7 +53,7 @@ class SpatioTemporalConv(nn.Module):
 class SpatioTemporalResBlock(nn.Module):
     
     def __init__(self, in_planes, out_planes, kernel_size, downsample = False, 
-                 name = 'SpatioTemporalResBlock'):
+                 bn_eps = 1e-3, bn_mom = 0.1, name = 'SpatioTemporalResBlock'):
         
         super(SpatioTemporalResBlock, self).__init__()
         
@@ -187,27 +187,35 @@ class R2Plus1DNet(nn.Module):
         # pre-fc
         x = self.pool(x)
         x = x.view(-1, 512)
-        print('Pre FC', x.shape)
+        if self._verbose:
+            print('Pre FC', x.shape)
         
         # fc linear layer
         x = self.linear(x)
-        print('Post FC', x.shape)
+        if self._verbose:
+            print('Post FC', x.shape)
         
         return x
         
 
 if __name__ is '__main__':
     device = torch.device('cpu')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2).to(device)
+    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2, verbose = True).to(device)
+    for end in model.VALID_ENDPOINTS:
+        if end in model.end_points.keys():
+            module = model.end_points[end]
+            if isinstance(module, nn.Module):
+                print(module)
+    print(model)
 
-    x = torch.randn((1, 2, 8, 112, 112)).to(device)
+#    x = torch.randn((1, 3, 8, 112, 112)).to(device)
     
-    try:
-        model(x)
-    except RuntimeError as e:
-        pass
-        if 'out of memory' in str(e):
-            for p in model.parameters():
-                if p.grad is not None:
-                    del p.grad
-            torch.cuda.empty_cache()
+#    try:
+#        model(x)
+#    except RuntimeError as e:
+#        pass
+#        if 'out of memory' in str(e):
+#            for p in model.parameters():
+#                if p.grad is not None:
+#                    del p.grad
+#            torch.cuda.empty_cache()

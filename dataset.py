@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import numpy as np
 import random
+import cv2
 
 from torch.utils.data import Dataset
 
@@ -108,5 +109,12 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('hmdb', 0, 'train', 'rgb', test_mode = True, test_amt = 1)
-    print(test.__len__())
+    test = VideoDataset('hmdb', 0, 'train', 'rgb', test_mode = False)
+    img, _ = test.__getitem__(0)
+    
+    for i in range(img.shape[1]):
+        frame = img[:, i, :, :].transpose(1, 2, 0)
+        cv2.imshow('buffer', frame)
+        cv2.waitKey(100)
+    
+    cv2.destroyAllWindows()

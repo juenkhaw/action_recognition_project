@@ -13,7 +13,8 @@ class Conv3D(nn.Module):
     
     def __init__(self, in_planes, out_planes, kernel_size, 
                  stride = (1, 1, 1), padding = 'SAME', activation = F.relu, 
-                 use_BN = True, use_bias = False, name = '3D_Conv'):
+                 use_BN = True, bn_mom = 0.1, bn_eps = 1e-3, 
+                 use_bias = False, name = '3D_Conv'):
         
         super(Conv3D, self).__init__()
        
@@ -28,13 +29,13 @@ class Conv3D(nn.Module):
                                stride = self._stride, padding = (0, 0, 0), bias = use_bias)
         
         if use_BN:
-            self.bn1 = nn.BatchNorm3d(out_planes, eps=0.001, momentum=0.01)
+            self.bn1 = nn.BatchNorm3d(out_planes, eps=bn_eps, momentum=bn_mom)
         
     def compute_pad(self, dim, s):
         if s % self._stride[dim] == 0:
             return max(self._kernel_size[dim] - self._stride[dim], 0)
         else:
-            return max(self._kernel_size[dim] - (s % self._stride[dim]), 0)     
+            return max(self._kernel_size[dim] - (s % self._stride[dim]), 0)
         
     def forward(self, x):
         
