@@ -22,7 +22,7 @@ class Conv3D(nn.Module):
         self._kernel_size = kernel_size
         self._stride = stride
         self._padding = padding
-        self._activation = activation
+        self.activation = activation
         self._use_BN = use_BN
         
         #presummed padding = 0, to be dynamically padded later on
@@ -61,8 +61,8 @@ class Conv3D(nn.Module):
         
         if self._use_BN:
             x = self.bn1(x)
-        if self._activation is not None:
-            x = self._activation(x)
+        if self.activation is not None:
+            x = self.activation(x)
             
         return x
 
@@ -111,6 +111,17 @@ def msra_init(net):
             if module.bias is not None:
                 init.constant_(module.bias, 0)
     #print(count)
+    
+def getModuleCount(net):
+    count = [0, 0, 0]
+    for module in net.modules():
+        if isinstance(module, nn.Conv3d):
+            count[0] += 1
+        elif isinstance(module, nn.BatchNorm3d):
+            count[1] += 1
+        elif isinstance(module, nn.Linear):
+            count[2] += 1
+    print(count)
     
 if __name__ is '__main__':
     

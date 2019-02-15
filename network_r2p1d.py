@@ -17,6 +17,7 @@ class SpatioTemporalConv(nn.Module):
     
     def __init__(self, in_planes, out_planes, kernel_size, stride = (1, 1, 1), 
                  bn_mom = 0.1, bn_eps = 1e-3, mi = None, 
+                 bn_relu_first_conv = True, bn_relu_second_conv = False, 
                  padding = 'SAME', use_bias = False, name = 'SpatioTemporalConv'):
         
         super(SpatioTemporalConv, self).__init__()
@@ -40,12 +41,13 @@ class SpatioTemporalConv(nn.Module):
         # perform 2D Conv --> BN --> ReLU --> 1D Conv
         self.spatial_conv = module.Conv3D(in_planes, inter_planes, kernel_size = spatial_f, 
                                           stride = spatial_s, padding = padding, 
-                                          use_BN = True, bn_mom = bn_mom, bn_eps = bn_eps, 
-                                          activation = F.relu, use_bias = use_bias)
+                                          use_BN = bn_relu_first_conv, bn_mom = bn_mom, bn_eps = bn_eps, 
+                                          activation = F.relu if bn_relu_first_conv else None, use_bias = use_bias)
         
         self.temporal_conv = module.Conv3D(inter_planes, out_planes, kernel_size = temporal_f, 
-                                           stride = temporal_s, padding = padding, use_BN = False,
-                                           activation = None, use_bias = use_bias)
+                                           stride = temporal_s, padding = padding, use_BN = bn_relu_second_conv, 
+                                           bn_mom = bn_mom, bn_eps = bn_eps, 
+                                           activation = F.relu if bn_relu_second_conv else None, use_bias = use_bias)
         
     def forward(self, x):
         x = self.spatial_conv(x)
@@ -66,7 +68,7 @@ class SpatioTemporalResBlock(nn.Module):
         
         if self._downsample:
             #downsample x to be the same spatiotemporal dimension as output
-            self.downsampleconv = nn.Conv3d(in_planes, out_planes, [1, 1, 1], stride = [2, 2, 2])
+            self.downsampleconv = nn.Conv3d(in_planes, out_planes, [1, 1, 1], stride = [2, 2, 2], bias = False)
             self.downsamplebn = nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps)
             
             #downsample the residual
@@ -145,7 +147,7 @@ class R2Plus1DNet(nn.Module):
         self.net = nn.ModuleList([
                 SpatioTemporalConv(in_channels, 64, kernel_size = (3, 7, 7), 
                        stride = (1, 2, 2), padding = 'SAME', mi = 45, name = name + self.VALID_ENDPOINTS[0], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
+                       bn_mom = bn_momentum, bn_eps = bn_epson, bn_relu_second_conv = True).to(device),
                 SpatioTemporalResModule(64, 64, kernel_size = (3, 3, 3), 
                        layer_size = layer_sizes[0], downsample = False, name = name + self.VALID_ENDPOINTS[1], 
                        bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
@@ -199,10 +201,10 @@ if __name__ is '__main__':
     device = torch.device('cpu')
     model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2, verbose = True).to(device)
     #module.model_summary(model)
-    module.msra_init(model)
+    #module.msra_init(model)
 
-    x = torch.randn((1, 2, 8, 112, 112)).to(device)
-    model(x)
+    #x = torch.randn((1, 2, 8, 112, 112)).to(device)
+    #model(x)
     
 #    try:
 #        model(x)

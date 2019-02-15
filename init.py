@@ -34,6 +34,7 @@ parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to b
 parser.add_argument('-wn', '--worker-num', help = 'number of workers for some processes (safer to set at 0; -1 set as number of device)', default = 0, type = int)
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
+parser.add_argument('-va', '--validation-mode', help = 'activate validation mode', action = 'store_true', default = False)
 
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -53,6 +54,7 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 
+# Uncomment this to test on whether the Dataloader is working
 ########### DATALOADER TESTING ZONE
 #dataset = VideoDataset(args.dataset, args.split, 'train', args.modality, 
 #                       clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt)
@@ -69,7 +71,7 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
                     in_channels = in_channels[args.modality], verbose = args.verbose1, 
                     bn_momentum = args.bn_momentum, bn_epson = args.bn_epson).to(device)
 # initialize the model parameters according to msra_fill initialization
-msra_init(model)
+#msra_init(model)
 
 # initialize loss function, optimizer, and scheduler
 criterion = nn.CrossEntropyLoss()
@@ -84,25 +86,32 @@ train_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'train', ar
 
 val_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.modality, 
                                          clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
-                            batch_size = args.batch_size, num_workers = num_workers)
+                            batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
 
 dataloaders = {'train': train_dataloader, 'val': val_dataloader}
 
+# Uncomment this to test on only few randomly selected classes
+# Note: Training tends to fail when num_classess is too small
+# Solved by disabling validation mode, possible cause is that no sample for the validation y label
 ############# MODEL TESTING ZONE
-#old_y = set(np.append(train_dataloader.dataset._labels, val_dataloader.dataset._labels))
-#num_classes = len(old_y)
-#y_dict = {old_label : new_label for new_label, old_label in enumerate(old_y)}
-#train_dataloader.dataset._labels = np.array([y_dict[i] for i in train_dataloader.dataset._labels], dtype = int)
+old_y = set(list(train_dataloader.dataset._labels))
+num_classes = len(old_y)
+y_dict = {old_label : new_label for new_label, old_label in enumerate(old_y)}
+train_dataloader.dataset._labels = np.array([y_dict[i] for i in train_dataloader.dataset._labels], dtype = int)
 #val_dataloader.dataset._labels = np.array([y_dict[i] for i in val_dataloader.dataset._labels], dtype = int)
 #print(train_dataloader.dataset._labels, val_dataloader.dataset._labels)
-#model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes, device, 
-#                    in_channels = in_channels[args.modality], verbose = False).to(device)
-msra_init(model)
+model.replaceLinear(num_classes)
+model.to(device)
+#msra_init(model)
 #############
 
 if args.verbose2:
-    print('Dataset loaded:', args.dataset, 'containing', len(train_dataloader.dataset), 'training samples', 
-      'and', len(val_dataloader.dataset), 'validation samples')
+    if args.validation_mode:
+        print('Dataset loaded:', args.dataset, 'containing', len(train_dataloader.dataset), 'training samples', 
+              'and', len(val_dataloader.dataset), 'validation samples')
+    else:
+        print('Dataset loaded:', args.dataset, 'containing', len(train_dataloader.dataset), 'training samples', 
+              'and', 'None' , 'validation samples')
 
 
 # to record time elapsed
@@ -114,7 +123,7 @@ if args.verbose2:
 
 for epoch in range(epoch, args.epoch):
         
-    for phase in ['train', 'val']:
+    for phase in ['train', 'val'] if args.validation_mode else ['train']:
         
         # reset the loss and accuracy
         current_loss = 0
@@ -163,7 +172,7 @@ for epoch in range(epoch, args.epoch):
             epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
             
             if args.verbose2:
-                print(f'Epoch {epoch} {phase} Loss = {epoch_loss:.4f} Accuracy = {epoch_acc:.2f}')
+                print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
 
 # display the time elapsed
 time_elapsed = time.time() - start    
