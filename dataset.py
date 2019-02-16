@@ -98,7 +98,7 @@ class VideoDataset(Dataset):
         
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
-        buffer = video_module.load_video(self._clip_names[index], self._modality, 
+        buffer = video_module.load_training_video(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
                                          self._crop_height, self._crop_width, self._crop_depth)
         return buffer, self._labels[index]
