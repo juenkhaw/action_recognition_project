@@ -17,11 +17,13 @@ from video_module import load_clips
 
 class VideoDataset(Dataset):
     """
-    Constructor of this class requires:
-        dataset : [ucf / hmdb]
-        split : [0/1/2/3] where 0 indicates loading all dataset at once
-        mode : [train / test]
-        modelity : [rgb / flow]
+    Dataset class for managing training / testing video dataset and Dataloader object
+    
+    Constructor requires:
+        dataset : [ucf / hmdb] videoset to be loaded
+        split : [0/1/2/3] split set to be loaded where 0 indicates loading all dataset at once
+        mode : [train / test] training or testing dataset to be loaded
+        modelity : [rgb / flow] modality of the videoset to be loaded
         clip_len : [8 / 16] Target depth of training/testing clips
         test_mode : Activates to run on small samples to verify the correctness of implementation
         test_amt : Amount of labelled samples to be used if test_mode is activated
@@ -48,8 +50,10 @@ class VideoDataset(Dataset):
         assert(split in list(range(4)))
         assert(mode in ['train', 'test'])
         assert(modality in ['rgb', 'flow'])
+        # training should only be done on clips
         if mode == 'train':
             assert(load_mode == 'clip')
+        # clip mode should invovle only one clip per video
         if load_mode == 'clip':
             assert(clips_per_video == 1)
         else:
@@ -71,14 +75,15 @@ class VideoDataset(Dataset):
                 frame_dir = Path(main_dir/'hmdb51_jpegs_256'/'jpegs_256')
             else:
                 frame_dir = Path(main_dir/'hmdb51_tvl1_flow'/'tvl1_flow')
-            
+        
+        # appends mapping from all splits if loading of whole dataset is intended
         if split == 0:
             for i in range(3):
                 txt_files.append(dataset + '_' + mode + 'list0' + str(i + 1) + '.txt')
         else:
             txt_files.append(dataset + '_' + mode + 'list0' + str(split) + '.txt')
             
-        # reading in the content of mapping text files
+        # reading in the content of mapping text files into a buffer
         buffer_str = []
         for i in range(len(txt_files)):
             fo_txt = open(main_dir/txt_files[i], 'r')
@@ -86,6 +91,8 @@ class VideoDataset(Dataset):
         fo_txt.close()
         
         # organize raw strings mapping into X and y np arrays
+        # X is the path to the directory where frames/flows are located
+        # y is the true label
         self._clip_names, labels = [], []
         for i in range(len(buffer_str)):
             buffer_map = buffer_str[i].split(' ')

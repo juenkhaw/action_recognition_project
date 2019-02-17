@@ -15,6 +15,7 @@ from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
 from module import msra_init
 from train_net import train_model
+from test_net import test_model
 
 parser = argparse.ArgumentParser(description = 'PyTorch 2.5D Action Recognition ResNet')
 
@@ -35,6 +36,9 @@ parser.add_argument('-wn', '--worker-num', help = 'number of workers for some pr
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
 parser.add_argument('-va', '--validation-mode', help = 'activate validation mode', action = 'store_true', default = False)
+parser.add_argument('-lm', '--load-mode', help = 'load testing samples as series of clips (video) or a single clip', default = 'clip', choices = ['video', 'clip'])
+parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k predicted labels', default = 1, type = int)
+parser.add_argument('-nclip', '--clips-per-video', help = 'number of clips for testing video in video-level prediction', default = 10, type = int)
 
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -42,14 +46,14 @@ parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of l
 args = parser.parse_args()
 print(args)
 
-# Use GPU if available
+# Allocate device (gpu/cpu) to be used in training and testing
 device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
 num_workers = torch.cuda.device_count() if args.worker_num == -1 else args.worker_num
 
 if args.verbose2:
     print('Device being used:', device)
 
-# intialize the model
+# intialize the model hyperparameters
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
@@ -77,10 +81,11 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
 # initialize loss function, optimizer, and scheduler
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr = args.learning_rate)
+
 # decay lr by dividing alpha 0.1 every 10 epochs
 scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = args.step_size, gamma = args.lr_decay)
                                         
-# prepare the datasets
+# prepare the training datasets and validation datasets (if have)
 train_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'train', args.modality, 
                                            clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                               batch_size = args.batch_size, shuffle = True, num_workers = num_workers)
@@ -89,26 +94,21 @@ val_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.
                                          clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                             batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
 
-#test_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.modality, 
-#                                         clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt
-#                                         ,load_mode = 'video', clips_per_video = 10), 
-#                            batch_size = args.batch_size, num_workers = num_workers)
-
 dataloaders = {'train': train_dataloader, 'val': val_dataloader}
 
 # Uncomment this to test on only few randomly selected classes
 # Note: Training tends to fail when num_classess is too small
 # Solved by disabling validation mode, possible cause is that no sample for the validation y label
 ############# MODEL TESTING ZONE
-old_y = set(list(train_dataloader.dataset._labels))
-num_classes = len(old_y)
-y_dict = {old_label : new_label for new_label, old_label in enumerate(old_y)}
-train_dataloader.dataset._labels = np.array([y_dict[i] for i in train_dataloader.dataset._labels], dtype = int)
-#val_dataloader.dataset._labels = np.array([y_dict[i] for i in val_dataloader.dataset._labels], dtype = int)
-#print(train_dataloader.dataset._labels, val_dataloader.dataset._labels)
-model.replaceLinear(num_classes)
-model.to(device)
-#msra_init(model)
+#old_y = set(list(train_dataloader.dataset._labels))
+#num_classes = len(old_y)
+#y_dict = {old_label : new_label for new_label, old_label in enumerate(old_y)}
+#train_dataloader.dataset._labels = np.array([y_dict[i] for i in train_dataloader.dataset._labels], dtype = int)
+##val_dataloader.dataset._labels = np.array([y_dict[i] for i in val_dataloader.dataset._labels], dtype = int)
+##print(train_dataloader.dataset._labels, val_dataloader.dataset._labels)
+#model.replaceLinear(num_classes)
+#model.to(device)
+##msra_init(model)
 #############
 
 if args.verbose2:
@@ -119,5 +119,18 @@ if args.verbose2:
         print('Dataset loaded:', args.dataset, args.modality, 'containing', len(train_dataloader.dataset), 'training samples', 
               'and', 'None' , 'validation samples')
 
-train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
+# train model
+#train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
 
+# initialize testing dataset for clip/video level predictions
+test_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.modality, 
+                                         clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt,
+                                         load_mode = args.load_mode, clips_per_video = args.clips_per_video), 
+                            batch_size = args.batch_size, num_workers = num_workers, shuffle = False)
+        
+if args.verbose2:
+    print('Dataset loaded:', args.dataset, args.modality, 'containing', len(test_dataloader.dataset), 'testing samples')
+    print('Testing method:', args.load_mode, 'top', args.top_acc)
+
+# use the trained model to predict X_test
+#test_acc = test_model(args, device, model, test_dataloader, load_mode = args.load_mode, top_acc = args.top_acc)

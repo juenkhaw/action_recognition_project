@@ -14,6 +14,23 @@ import numpy as np
 import module
 
 class SpatioTemporalConv(nn.Module):
+    """
+    Module consisting of spatial and temporal convolution over input volume
+    
+    Constructor requires:
+        in_planes : channels of input volume
+        out_planes : channels of output activations
+        kernel_size : filter sizes (t, h, w)
+        stride : (t, h, w) striding over the input volume
+        bn_mom : BN momentum hyperparameter
+        bn_eps : BN epsilon hyperparameter
+        mi : channels of the intermediate convolution (computes with formula if set to None)
+        bn_relu_first_conv : applies BN and activation on spatial conv or not
+        bn_relu_second_conv : applies BN and activation on temporal conv or not
+        padding : [SAME/VALID] padding technique to be applied
+        use_BN : applies Batch Normalization or not
+        name : module name
+    """
     
     def __init__(self, in_planes, out_planes, kernel_size, stride = (1, 1, 1), 
                  bn_mom = 0.1, bn_eps = 1e-3, mi = None, 
@@ -31,7 +48,7 @@ class SpatioTemporalConv(nn.Module):
         temporal_s = [stride[0], 1, 1]
         temporal_p = [padding[0], 0, 0]
         
-        # compute the intermediate planes between spatial and temporal conv
+        # compute the intermediate planes between spatial and temporal conv if not explicitly provided
         if mi is None:
             inter_planes = int((kernel_size[0] * in_planes * out_planes * kernel_size[1] * kernel_size[2]) / 
                                (in_planes * kernel_size[1] * kernel_size[2] + kernel_size[0] * out_planes))
@@ -58,6 +75,18 @@ class SpatioTemporalConv(nn.Module):
         return x
     
 class SpatioTemporalResBlock(nn.Module):
+    """
+    Residual block consists of multiple modules of spatiotemporal convolution
+    
+    Constructor requires:
+        in_planes : channels of input volume
+        out_planes : channels of output activations
+        kernel_size : filter sizes (t, h, w)
+        downsample : activates to apply 1*1*1 conv on shortcut to obtain volumes same as the residual
+        bn_mom : BN momentum hyperparameter
+        bn_eps : BN epsilon hyperparameter
+        name : module name
+    """
     
     def __init__(self, in_planes, out_planes, kernel_size, downsample = False, 
                  bn_eps = 1e-3, bn_mom = 0.1, name = 'SpatioTemporalResBlock'):
@@ -102,6 +131,18 @@ class SpatioTemporalResBlock(nn.Module):
         return self.relu2(x + res)
     
 class SpatioTemporalResModule(nn.Module):
+    """
+    Residual module consists of multiple residual blocks based on the network depth
+    
+    Constructor requires:
+        in_planes : channels of input volume
+        out_planes : channels of output activations
+        kernel_size : filter sizes (t, h, w)
+        layer_size : repetation count of residual blocks
+        block_type : type of residual block
+        downsample : activates to apply 1*1*1 conv on shortcut to obtain volumes same as the residual
+        name : module name
+    """
     
     def __init__(self, in_planes, out_planes, kernel_size, layer_size, 
                  block_type = SpatioTemporalResBlock, downsample = False, 
@@ -110,7 +151,7 @@ class SpatioTemporalResModule(nn.Module):
         
         super(SpatioTemporalResModule, self).__init__()
         
-        #implement the first conv to increase channels
+        #implement the first conv to produce activation with volume same as the output
         self.block1 = block_type(in_planes, out_planes, kernel_size, downsample, bn_mom = bn_mom, bn_eps = bn_eps)
         
         #the rest conv operations are identical
@@ -126,6 +167,20 @@ class SpatioTemporalResModule(nn.Module):
         return x
     
 class R2Plus1DNet(nn.Module):
+    """
+    Complete network architecture of R2.5D ConvNet
+    
+    Constructor requires:
+        layer_sizes : list of integer indicating repetation count of residual blocks at each phase
+        num_classess : total label count
+        device : device id to be used on training/testing
+        block_type : type of residual block
+        in_channels : initial channels of the input volume
+        bn_momentum : BN momentum hyperparameter
+        bn_epson : BN epsilon hyperparameter
+        name : module name
+        verbose : prints activation output size after each phases or not
+    """
     
     VALID_ENDPOINTS = (
         'Conv3d_1_3x7x7',
@@ -170,6 +225,16 @@ class R2Plus1DNet(nn.Module):
         
 
     def replaceLinear(self, num_classes):
+        """
+        Replaces the FC linear layer with updated label count
+        
+        Inputs:
+            num_classess : updated label count
+            
+        Returns:
+            None
+        """
+        
         self._num_classes = num_classes
         self.linear = nn.Linear(512, num_classes)        
         

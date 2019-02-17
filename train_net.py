@@ -9,6 +9,22 @@ import time
 import torch
 
 def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
+    """
+    This function trains (and validates if available) network with appointed training set, optmizer, criterion
+    and scheduler (if available)
+    
+    Inputs:
+        args : arguments dict passed from main function
+        device : device id to be used in training
+        model : model object to be trained
+        dataloaders : dataloader dict containing dataloaders for training (and validation) datasets
+        optimizer : optimizer object for parameters learning
+        criterion : criterion object for computing loss
+        scheduler (optional) : scheduler object for learning rate decay
+        
+    Outputs:
+        None
+    """
 
     start = time.time()
     epoch = 0

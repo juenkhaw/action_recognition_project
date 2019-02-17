@@ -4,4 +4,67 @@ Created on Sat Feb 16 15:26:48 2019
 
 @author: Juen
 """
+import time
+import numpy as np
 
+def test_model(args, device, model, test_dataloader, load_mode, top_acc):
+    """
+    This function evaluates trained model on testing dataset
+    
+    Inputs:
+        args : arguments dict passed from main function
+        device : device id to be used in training
+        model : model object to be trained
+        test_dataloader : dataloader object containing testing dataset
+        load_mode : [clip/video] performs clip/video level prediction
+        top_acc : top N predicted labels to be considered as predicted results
+        
+    Outputs:
+        test_acc : Testing accuracy
+    """
+    
+    start = time.time()
+    
+    if args.verbose2:
+        print('Starting to test model.......')
+        
+    test_correct = 0
+    test_acc = 0
+    
+    for inputs, labels in test_dataloader:
+        #print(inputs.shape, labels.shape)
+        # if loading series of clip, reshaping the inputs tensor to fit into the model
+        # from [sample, clips, channel, frame, h, w] to [sample * clips, -1]
+        if load_mode == 'video':
+            current_batch_size = inputs.shape[0]
+            clips_size = inputs.shape[1]
+            inputs = inputs.view(-1, inputs.shape[2], inputs.shape[3], 
+                                 inputs.shape[4], inputs.shape[5])
+        
+        inputs = inputs.to(device)
+        
+        # reshaping labels tensor
+        labels = np.array(labels).reshape(len(labels), 1)
+        
+        # use model to predict scores
+        # copy the tensor to host memory before converting to np array
+        outputs = model(inputs).cpu().detach().numpy()
+        #outputs = np.random.randn(current_batch_size * clips_size, 101)
+        
+        # average the scores for each classes across all clips that belong to the same video
+        averaged_score = np.average(np.array(np.split(outputs, 2)), axis = 1)
+        
+        # retrieve the label index with the top-N scores
+        top_k_indices = np.argsort(averaged_score, axis = 1)[:, -top_acc:][:, ::-1]
+        
+        # compute number of matches between predicted labels and true labels
+        test_correct += np.sum(top_k_indices == np.array(labels))
+    
+    # compute accuracy over predictions on current batch
+    test_acc = test_correct / len(test_dataloader.dataset)
+    
+    # display the time elapsed in testing
+    time_elapsed = time.time() - start
+    print(f"Testing complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    
+    return test_acc

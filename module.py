@@ -11,6 +11,22 @@ import torch.nn.functional as F
 import torch.nn.init as init
 
 class Conv3D(nn.Module):
+    """
+    Module consisting of 3D convolution, 3D BN and ReLU in combination
+    
+    Constructor requires:
+        in_planes : channels of input volume
+        out_planes : channels of output activations
+        kernel_size : filter sizes (t, h, w)
+        stride : (t, h, w) striding over the input volume
+        padding : [SAME/VALID] padding technique to be applied
+        activation : module for activation function (can be None)
+        use_BN : applies Batch Normalization or not
+        bn_mom : BN momentum hyperparameter
+        bn_eps : BN epsilon hyperparameter
+        use_bias : invovles bias learning in 3DConv/Linear or not
+        name : module name
+    """
     
     def __init__(self, in_planes, out_planes, kernel_size, 
                  stride = (1, 1, 1), padding = 'SAME', activation = F.relu, 
@@ -33,6 +49,17 @@ class Conv3D(nn.Module):
             self.bn1 = nn.BatchNorm3d(out_planes, eps = bn_eps, momentum = bn_mom)
         
     def compute_pad(self, dim, s):
+        """
+        Dynamically computes padding for each dimension of the input volume
+        
+        Inputs:
+            dim : dimension of the input volume
+            s : size (h/w/depth) of that particular dimension
+            
+        Returns:
+            padding of that particular dimension
+        """
+        
         if s % self._stride[dim] == 0:
             return max(self._kernel_size[dim] - self._stride[dim], 0)
         else:
@@ -67,8 +94,22 @@ class Conv3D(nn.Module):
         return x
 
 class MaxPool3DSame(nn.MaxPool3d):
+    """
+    Module of SAME max 3D pooling with dynamic padding
+    """
         
     def compute_pad(self, dim, s):
+        """
+        Dynamically computes padding for each dimension of the input volume
+        
+        Inputs:
+            dim : dimension of the input volume
+            s : size (h/w/depth) of that particular dimension
+            
+        Returns:
+            padding of that particular dimension
+        """
+        
         if s % self.stride[dim] == 0:
             return max(self.kernel_size[dim] - self.stride[dim], 0)
         else:
@@ -94,6 +135,17 @@ class MaxPool3DSame(nn.MaxPool3d):
         return super(MaxPool3DSame, self).forward(x)
     
 def msra_init(net):
+    """
+    Initializes parameters of the model with MSRA initialization method as 
+    implemented in the author program
+    
+    Inputs:
+        net : model to be trained on
+        
+    Returns:
+        None
+    """
+    
     #count = [0, 0, 0]
     for module in net.modules():
         if isinstance(module, nn.Conv3d):
@@ -113,6 +165,16 @@ def msra_init(net):
     #print(count)
     
 def getModuleCount(net):
+    """
+    Displays number of Conv3D, BN3D and Linear module in the model
+    
+    Inputs:
+        net : model to be trained on
+        
+    Returns:
+        None
+    """
+    
     count = [0, 0, 0]
     for module in net.modules():
         if isinstance(module, nn.Conv3d):

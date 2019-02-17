@@ -11,8 +11,14 @@ import cv2
 
 def temporal_crop(buffer_len, clip_len):
     """
-    This function accepts original video framecount (depth) and expected output length
-    Returns start and end indices of frame index to be included in the training process
+    Randomly crops the video over temporal dimension
+    
+    Inputs:
+        buffer_len : original video framecount (depth)
+        clip_len : expected output clip framecount
+        
+    Returns:
+        start_index, end_index : starting and ending indices of the clip
     """
     
     # randomly select time index for temporal jittering
@@ -23,8 +29,15 @@ def temporal_crop(buffer_len, clip_len):
 
 def temporal_uniform_crop(buffer_len, clip_len, clips_per_video):
     """
-    This function accepts original video framecount (depth), expected clip length, and clip count per video
-    Returns list of start and end indices of frame index uniformly sampled across the video with length of clips_per_video
+    Uniformly crops the video into N clips over temporal dimension
+    
+    Inputs:
+        buffer_len : original video framecount (depth)
+        clip_len : expected output clip framecount
+        clips_per_video : number of clips for each video sample
+        
+    Returns:
+        indices : list of starting and ending indices of each clips
     """
     
     # compute the average spacing between each consecutive clips
@@ -42,8 +55,15 @@ def temporal_uniform_crop(buffer_len, clip_len, clips_per_video):
 
 def spatial_crop(buffer_size, clip_size):
     """
-    This function accepts original video spatial size (h and w) and expected output spatial size
-    Returns starting point (x, y) on the frames to be cropped from
+    Randomly crops original video frames over spatial dimension
+    
+    Inputs:
+        buffer_size : size of the original scaled frames
+        clip_size : size of the output clip frames
+        
+    Returns:
+        start_h, start_w : (x, y) point of the top-left corner of the patch
+        end_h, end_w : (x, y) point of the bottom-right corner of the patch
     """
     
     # expected parameters to be a tuple of height and width
@@ -59,8 +79,15 @@ def spatial_crop(buffer_size, clip_size):
 
 def spatial_center_crop(buffer_size, clip_size):
     """
-    This function accepts original video spatial size (h and w) and expected output spatial size
-    Returns starting point (x, y) of the center patch on the frames to be cropped from
+    Crops a center patch from frames
+    
+    Inputs:
+        buffer_size : size of the original scaled frames
+        clip_size : size of the output clip frames
+        
+    Returns:
+        start_h, start_w : (x, y) point of the top-left corner of the patch
+        end_h, end_w : (x, y) point of the bottom-right corner of the patch
     """
     
     # expected parameters to be a tuple of height and width
@@ -76,8 +103,13 @@ def spatial_center_crop(buffer_size, clip_size):
 
 def normalize_buffer(buffer):
     """
-    This function accepts np array of clip pixels
-    Returns normalized np array of clip pixel values
+    Normalizes values of input frames buffer
+    
+    Inputs:
+        buffer : np array of unnormalized frames
+        
+    Returns:
+        buffer : np array of normalized frames
     """
     
     #normalize the pixel values to be in between -1 and 1
@@ -87,14 +119,20 @@ def normalize_buffer(buffer):
 def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, output_len, 
                mode = 'clip', clips_per_video = 1):
     """
-    This function accepts:
-        frame_path : (List of) directory where the frame images located
-        modality: [rgb / flow], to be passed from VideoDataset class argument
-        scale_h, scale_w : Target spatial size to which frames should resize
-        output_h, output_w : Target spatial size of training clip
-        output_len : Target depth of training clip
+    Reads original video frames/flows into memory and preprocesses them into training/testing input volume
+    
+    Inputs:
+        frame_path : list of directories where the original frames/flows located
+        modality : [rgb/flow] modality of video to be processed on
+        scale_h, scale_w : spatial size to be scaled into before cropping
+        output_h, output_w : spatail size to be cropped from the scaled frames/flows
+        output_len : temporal depth of the output clips
+        mode (optional) (testing only): [clip/video] 
+        to export a single randomly cropped clip or series of uniformly cropped clips as per video
+        clips_per_video (optional) (testing only) : clips count if exporting as series of clips
         
-    Returns preprocessed and normalized np array of a single training clip
+    Returns:
+        buffer : np array of preprocessed input volume
     """
     
     # mode can only be as clip or video
