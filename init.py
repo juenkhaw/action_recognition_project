@@ -89,6 +89,11 @@ val_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.
                                          clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                             batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
 
+#test_dataloader = DataLoader(VideoDataset(args.dataset, args.split, 'test', args.modality, 
+#                                         clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt
+#                                         ,load_mode = 'video', clips_per_video = 10), 
+#                            batch_size = args.batch_size, num_workers = num_workers)
+
 dataloaders = {'train': train_dataloader, 'val': val_dataloader}
 
 # Uncomment this to test on only few randomly selected classes

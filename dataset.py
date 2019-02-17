@@ -13,7 +13,7 @@ import cv2
 
 from torch.utils.data import Dataset
 
-import video_module
+from video_module import load_clips
 
 class VideoDataset(Dataset):
     """
@@ -27,14 +27,19 @@ class VideoDataset(Dataset):
         test_amt : Amount of labelled samples to be used if test_mode is activated
     """
     
-    def __init__(self, dataset, split, mode, modality, clip_len = 16, test_mode = True, test_amt = 8):
-        
+    def __init__(self, dataset, split, mode, modality, clip_len = 16, 
+                 test_mode = True, test_amt = 8, 
+                 load_mode = 'clip', clips_per_video = 1):
+   
         # declare the parameters chosen as described in R(2+1)D papers
         self._resize_height = 128
         self._resize_width = 171
         self._crop_height = 112
         self._crop_width = 112
+        self._mode = mode
         self._crop_depth = clip_len
+        self._load_mode = load_mode
+        self._clips_per_video = clips_per_video
         
         self._modality = modality
         
@@ -43,6 +48,13 @@ class VideoDataset(Dataset):
         assert(split in list(range(4)))
         assert(mode in ['train', 'test'])
         assert(modality in ['rgb', 'flow'])
+        if mode == 'train':
+            assert(load_mode == 'clip')
+        if load_mode == 'clip':
+            assert(clips_per_video == 1)
+        else:
+            assert(clips_per_video > 1)
+        
         
         # locate the video <-> label mapping text files
         txt_files = []
@@ -98,9 +110,11 @@ class VideoDataset(Dataset):
         
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
-        buffer = video_module.load_training_video(self._clip_names[index], self._modality, 
+        buffer = load_clips(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
-                                         self._crop_height, self._crop_width, self._crop_depth)
+                                         self._crop_height, self._crop_width, self._crop_depth, 
+                                         mode = self._load_mode, 
+                                         clips_per_video = self._clips_per_video)
         return buffer, self._labels[index]
     
     def __len__(self):
@@ -109,12 +123,12 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('hmdb', 0, 'train', 'rgb', test_mode = False)
+    test = VideoDataset('hmdb', 1, 'test', 'flow', test_mode = False, load_mode = 'video', clips_per_video = 10)
     img, _ = test.__getitem__(0)
     
-    for i in range(img.shape[1]):
-        frame = img[:, i, :, :].transpose(1, 2, 0)
-        cv2.imshow('buffer', frame)
-        cv2.waitKey(100)
+#    for i in range(img.shape[1]):
+#        frame = img[:, i, :, :].transpose(1, 2, 0)
+#        cv2.imshow('buffer', frame)
+#        cv2.waitKey(100)
     
     cv2.destroyAllWindows()

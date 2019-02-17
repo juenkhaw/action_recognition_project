@@ -98,7 +98,15 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     """
     
     # mode can only be as clip or video
+    if modality == 'rgb':
+        assert(len(frames_path) == 1)
+    else:
+        assert(len(frames_path) == 2)
     assert(mode in ['clip', 'video'])
+    if mode == 'clip':
+        assert(clips_per_video == 1)
+    else:
+        assert(clips_per_video > 1)
     
     # read path content and sample frame
     path_content = []
@@ -114,26 +122,26 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
         frame_chn = 2
     
     if mode == 'clip':
+        t_index = []
         # retrieve indices for random cropping
-        t_index = temporal_crop(frame_count, output_len)
+        t_index.append(temporal_crop(frame_count, output_len))
         s_index = spatial_crop((scale_h, scale_w), (output_h, output_w))
-        # create a buffer with size of 
-        # clips [clip_len, height, width, channel] or 
-        buffer = np.empty((output_len, output_h, output_w, frame_chn), np.float32)
+        #buffer = np.empty((output_len, output_h, output_w, frame_chn), np.float32)
     else:
         # retrieve indices for center cropping and temporal index for each clips
         t_index = temporal_uniform_crop(frame_count, output_len, clips_per_video)
         s_index = spatial_center_crop((scale_h, scale_w), (output_h, output_w))
-        # create a buffer with size of 
-        # video [clip_count, clip_len, height, width, channel]
-        buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
+    
+    # create a buffer with size of 
+    # video [clip_count, clip_len, height, width, channel]
+    buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
     
     # loading cropped video frames into the numpy array
     for c in range(clips_per_video):
         
-        count = t_index[0] if mode == 'clips' else t_index[c][0]
+        count = t_index[c][0]
         
-        while count < t_index[1] if mode == 'clips' else t_index[c][1]:
+        while count < t_index[c][1]:
             buffer_frame = []
             
             if frame_chn == 3:
@@ -159,26 +167,33 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
                 # copy to the video buffer
                 if modality == 'rgb':
-                    np.copyto(buffer[count - t_index[0], :, :, :] if mode == 'clips' else 
-                              buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
+                    np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
                 else:
-                    np.copyto(buffer[count - t_index[0], :, :, i] if mode == 'clips' else
-                              buffer[c, count - t_index[c][0], :, :, i], buffer_frame[i][:, :, 0])
+                    np.copyto(buffer[c, count - t_index[c][0], :, :, i], buffer_frame[i][:, :, 0])
             
             count += 1
     
     # normalize the video buffer
     buffer = normalize_buffer(buffer)
     
-    # convert array format to [chnl, depth, h, w] to cope with Pytorch
-    buffer = buffer.transpose((3, 0, 1 ,2))
+    # convert array format to cope with Pytorch
+    # [chnl, depth, h, w] for clips
+    # [clip, chnl, depth, h, w] for video
+    if mode == 'clip':
+        buffer = buffer[0, :, :, :, :]
+        buffer = buffer.transpose((3, 0, 1 ,2))
+    else:
+        buffer = buffer.transpose((0, 4, 1, 2, 3))
         
     return buffer
             
     
 if __name__ == '__main__':
-    #video_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_ApplyEyeMakeup_g01_c01'
-    video_path = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\u\v_ApplyEyeMakeup_g01_c01'
-    video_path2 = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\v\v_ApplyEyeMakeup_g01_c01'
-    buffer = load_video([video_path, video_path2], 'flow', 128, 171, 112, 112, 16)
+    #video_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_BasketballDunk_g20_c06'
+    video_path = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\u\v_BasketballDunk_g20_c06'
+    video_path2 = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\v\v_BasketballDunk_g20_c06'
+    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 16, mode = 'video', clips_per_video = 10)
+    cv2.imshow('buffer0', buffer[2, 0, 0, :, :])
+    cv2.imshow('buffer1', buffer[2, 1, 0, :, :])
+    cv2.waitKey(0)
     cv2.destroyAllWindows()
