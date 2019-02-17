@@ -10,6 +10,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 
+from collections import OrderedDict
+
 class Conv3D(nn.Module):
     """
     Module consisting of 3D convolution, 3D BN and ReLU in combination
@@ -29,7 +31,7 @@ class Conv3D(nn.Module):
     """
     
     def __init__(self, in_planes, out_planes, kernel_size, 
-                 stride = (1, 1, 1), padding = 'SAME', activation = F.relu, 
+                 stride = (1, 1, 1), padding = 'SAME', activation = True, 
                  use_BN = True, bn_mom = 0.1, bn_eps = 1e-3, 
                  use_bias = False, name = '3D_Conv'):
         
@@ -41,12 +43,18 @@ class Conv3D(nn.Module):
         self.activation = activation
         self._use_BN = use_BN
         
+        self.conv = nn.Sequential(OrderedDict([]))
+        
         #presummed padding = 0, to be dynamically padded later on
-        self.conv1 = nn.Conv3d(in_planes, out_planes, kernel_size = self._kernel_size, 
-                               stride = self._stride, padding = (0, 0, 0), bias = use_bias)
+        self.conv.add_module(name + 'conv', 
+                               nn.Conv3d(in_planes, out_planes, kernel_size = self._kernel_size, 
+                                         stride = self._stride, padding = (0, 0, 0), bias = use_bias))
         
         if use_BN:
-            self.bn1 = nn.BatchNorm3d(out_planes, eps = bn_eps, momentum = bn_mom)
+            self.conv.add_module(name + 'bn', nn.BatchNorm3d(out_planes, eps = bn_eps, momentum = bn_mom))
+            
+        if activation:
+            self.conv.add_module(name + 'relu', nn.ReLU())
         
     def compute_pad(self, dim, s):
         """
@@ -84,14 +92,7 @@ class Conv3D(nn.Module):
             
             x = F.pad(x, pad)
             
-        x = self.conv1(x)
-        
-        if self._use_BN:
-            x = self.bn1(x)
-        if self.activation is not None:
-            x = self.activation(x)
-            
-        return x
+        return self.conv(x)
 
 class MaxPool3DSame(nn.MaxPool3d):
     """

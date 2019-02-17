@@ -10,6 +10,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 import numpy as np
+from collections import OrderedDict
 
 import module
 
@@ -59,12 +60,14 @@ class SpatioTemporalConv(nn.Module):
         self.spatial_conv = module.Conv3D(in_planes, inter_planes, kernel_size = spatial_f, 
                                           stride = spatial_s, padding = padding, 
                                           use_BN = bn_relu_first_conv, bn_mom = bn_mom, bn_eps = bn_eps, 
-                                          activation = F.relu if bn_relu_first_conv else None, use_bias = use_bias)
+                                          activation = bn_relu_first_conv, use_bias = use_bias, 
+                                          name = 'spatial_')
         
         self.temporal_conv = module.Conv3D(inter_planes, out_planes, kernel_size = temporal_f, 
                                            stride = temporal_s, padding = padding, use_BN = bn_relu_second_conv, 
                                            bn_mom = bn_mom, bn_eps = bn_eps, 
-                                           activation = F.relu if bn_relu_second_conv else None, use_bias = use_bias)
+                                           activation = bn_relu_second_conv, use_bias = use_bias, 
+                                           name = 'temporal_')
         
     def forward(self, x):
         x = self.spatial_conv(x)
@@ -94,41 +97,48 @@ class SpatioTemporalResBlock(nn.Module):
         super(SpatioTemporalResBlock, self).__init__()
         
         self._downsample = downsample
+        self.res_block = nn.Sequential(OrderedDict([]))
+        self.relu = nn.Sequential(OrderedDict([]))
         
         if self._downsample:
-            #downsample x to be the same spatiotemporal dimension as output
-            self.downsampleconv = nn.Conv3d(in_planes, out_planes, [1, 1, 1], stride = [2, 2, 2], bias = False)
-            self.downsamplebn = nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps)
-            
-            #downsample the residual
-            self.conv1 = SpatioTemporalConv(in_planes, out_planes, kernel_size, padding = 'SAME', 
-                                            stride = (2, 2, 2), bn_mom = bn_mom, bn_eps = bn_eps)
-            
+            self.downsample_block = nn.Sequential(OrderedDict([
+                
+                #downsample x to be the same spatiotemporal dimension as output
+                (name + '_downsample_1x1x1_conv', 
+                 nn.Conv3d(in_planes, out_planes, [1, 1, 1], stride = [2, 2, 2], bias = False)),
+                (name + '_downsample_bn',
+                 nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps))
+                ]))
+                     
+                    #downsample the residual
+            self.res_block.add_module(name + '_conv1',
+                SpatioTemporalConv(in_planes, out_planes, kernel_size, padding = 'SAME', 
+                                   stride = (2, 2, 2), bn_mom = bn_mom, bn_eps = bn_eps))
+
         else:
             #do not downsample the x
-            self.conv1 = SpatioTemporalConv(in_planes, out_planes, kernel_size, padding = 'SAME', 
-                                            bn_mom = bn_mom, bn_eps = bn_eps)
-            
-        self.bn1 = nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps)
-        self.relu1 = nn.ReLU()
+            self.res_block.add_module(name + '_conv1', 
+                SpatioTemporalConv(in_planes, out_planes, kernel_size, padding = 'SAME', 
+                                   bn_mom = bn_mom, bn_eps = bn_eps))
         
-        self.conv2 = SpatioTemporalConv(out_planes, out_planes, kernel_size, padding = 'SAME', 
-                                        bn_mom = bn_mom, bn_eps = bn_eps)
-        self.bn2 = nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps)
-        self.relu2 = nn.ReLU()
+        self.res_block.add_module(name + '_bn1', nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps))
+        self.res_block.add_module(name + '_relu1', nn.ReLU())
+        
+        self.res_block.add_module(name + '_conv2', SpatioTemporalConv(out_planes, out_planes, kernel_size, padding = 'SAME', 
+                                        bn_mom = bn_mom, bn_eps = bn_eps))
+        self.res_block.add_module(name + '_bn2', nn.BatchNorm3d(out_planes, momentum = bn_mom, eps = bn_eps))
+        
+        self.relu.add_module(name + '_relu_out', nn.ReLU())
         
     def forward(self, x):
         
-        res = self.relu1(self.bn1(self.conv1(x)))
-        #print(res.shape)
-        res = self.bn2(self.conv2(res))
-        #print(res.shape)
+        res = self.res_block(x)
         
         if self._downsample:
-            x = self.downsamplebn(self.downsampleconv(x))
+            x = self.downsample_block(x)
             
         #print(x.shape)
-        return self.relu2(x + res)
+        return self.relu(x + res)
     
 class SpatioTemporalResModule(nn.Module):
     """
@@ -152,16 +162,22 @@ class SpatioTemporalResModule(nn.Module):
         super(SpatioTemporalResModule, self).__init__()
         
         #implement the first conv to produce activation with volume same as the output
-        self.block1 = block_type(in_planes, out_planes, kernel_size, downsample, bn_mom = bn_mom, bn_eps = bn_eps)
+        module_name = name[:-1] + '1'
+        self.res_module = nn.Sequential(OrderedDict([
+                (module_name, 
+                 block_type(in_planes, out_planes, kernel_size, downsample, 
+                            bn_mom = bn_mom, bn_eps = bn_eps, name = module_name))
+                ]))
         
         #the rest conv operations are identical
-        self.blocks = nn.ModuleList([])
         for i in range(layer_size - 1):
-            self.blocks += [block_type(out_planes, out_planes, kernel_size, bn_mom = bn_mom, bn_eps = bn_eps)]
+            module_name = name[:-1] + str(i + 2)
+            self.res_module.add_module(module_name, 
+                            block_type(out_planes, out_planes, kernel_size, 
+                                       bn_mom = bn_mom, bn_eps = bn_eps, name = module_name))
             
     def forward(self, x):
-        x = self.block1(x)
-        for block in self.blocks:
+        for block in self.res_module:
             x = block(x)
             
         return x
@@ -182,15 +198,6 @@ class R2Plus1DNet(nn.Module):
         verbose : prints activation output size after each phases or not
     """
     
-    VALID_ENDPOINTS = (
-        'Conv3d_1_3x7x7',
-        'Conv3d_2_x',
-        'Conv3d_3_x',
-        'Conv3d_4_x',
-        'Conv3d_5_x',
-        'Logits',
-    )
-    
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
                  in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = 'True'):
             
@@ -199,29 +206,34 @@ class R2Plus1DNet(nn.Module):
         self._num_classes = num_classes
         self._verbose = verbose
         
-        self.net = nn.ModuleList([
+        self.net = nn.Sequential(OrderedDict([
+                ('conv1',
                 SpatioTemporalConv(in_channels, 64, kernel_size = (3, 7, 7), 
-                       stride = (1, 2, 2), padding = 'SAME', mi = 45, name = name + self.VALID_ENDPOINTS[0], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson, bn_relu_second_conv = True).to(device),
+                       stride = (1, 2, 2), padding = 'SAME', mi = 45, name = 'conv1', 
+                       bn_mom = bn_momentum, bn_eps = bn_epson, bn_relu_second_conv = True).to(device)),
+                ('conv2_x', 
                 SpatioTemporalResModule(64, 64, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[0], downsample = False, name = name + self.VALID_ENDPOINTS[1], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
+                       layer_size = layer_sizes[0], downsample = False, name = 'conv2_x', 
+                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device)),
+                ('conv3_x', 
                 SpatioTemporalResModule(64, 128, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[1], downsample = True, name = name + self.VALID_ENDPOINTS[2], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
+                       layer_size = layer_sizes[1], downsample = True, name = 'conv3_x', 
+                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device)),
+                ('conv4_x', 
                 SpatioTemporalResModule(128, 256, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[2], downsample = True, name = name + self.VALID_ENDPOINTS[3], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
+                       layer_size = layer_sizes[2], downsample = True, name = 'conv4_x', 
+                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device)),
+                ('conv5_x', 
                 SpatioTemporalResModule(256, 512, kernel_size = (3, 3, 3), 
-                       layer_size = layer_sizes[3], downsample = True, name = name + self.VALID_ENDPOINTS[4], 
-                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device),
-                ])
+                       layer_size = layer_sizes[3], downsample = True, name = 'conv5_x', 
+                       bn_mom = bn_momentum, bn_eps = bn_epson).to(device)),
+                ]))
         
         # Logits
-        self.pool = nn.AdaptiveAvgPool3d(1)
+        self.avgpool = nn.AdaptiveAvgPool3d(1)
         
         #self.linear = nn.Linear(512, num_classes)
-        self.linear = nn.Linear(512, num_classes)
+        self.linear1 = nn.Linear(512, num_classes)
         
 
     def replaceLinear(self, num_classes):
@@ -236,7 +248,7 @@ class R2Plus1DNet(nn.Module):
         """
         
         self._num_classes = num_classes
-        self.linear = nn.Linear(512, num_classes)        
+        self.linear1 = nn.Linear(512, num_classes)        
         
     def forward(self, x):
         
@@ -250,13 +262,13 @@ class R2Plus1DNet(nn.Module):
                 print(self.VALID_ENDPOINTS[i], x.shape)
         
         # pre-fc
-        x = self.pool(x)
+        x = self.avgpool(x)
         x = x.view(-1, 512)
         if self._verbose:
             print('Pre FC', x.shape)
         
         # fc linear layer
-        x = self.linear(x)
+        x = self.linear1(x)
         if self._verbose:
             print('Post FC', x.shape)
         
