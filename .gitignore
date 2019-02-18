@@ -4,3 +4,4 @@ __pycache__/video_module.cpython-37.pyc
 *.pkl
 *.pyc
 trainer.py
+*.tar

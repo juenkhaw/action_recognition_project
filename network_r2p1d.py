@@ -260,7 +260,7 @@ class R2Plus1DNet(nn.Module):
             x = self.net[i](x)
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
-        
+                
         # pre-fc
         x = self.avgpool(x)
         x = x.view(-1, 512)
@@ -272,7 +272,7 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Post FC', x.shape)
         
-        return x        
+        return x    
 
 if __name__ is '__main__':
     device = torch.device('cpu')

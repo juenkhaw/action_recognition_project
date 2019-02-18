@@ -23,9 +23,13 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
         scheduler (optional) : scheduler object for learning rate decay
         
     Outputs:
-        None
+        train_loss : list of training loss for each epoch
+        train_acc : list of training accuracy for each epoch
+        time_elapsed : time taken in training
     """
-
+    
+    train_loss = []
+    train_acc = []
     start = time.time()
     epoch = 0
     
@@ -78,13 +82,18 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     current_loss += loss.item() * inputs.size(0)
                     current_correct += torch.sum(preds == labels.data)
                 
-                # compute the loss and accuracy for the current batch
-                epoch_loss = current_loss / len(dataloaders[phase].dataset)
-                epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
-                
-                if args.verbose2:
-                    print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
+            # compute the loss and accuracy for the current batch
+            epoch_loss = current_loss / len(dataloaders[phase].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
+            
+            train_loss.append(epoch_loss)
+            train_acc.append(epoch_acc)
+            
+            if args.verbose2:
+                print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
     
     # display the time elapsed
     time_elapsed = time.time() - start    
-    print(f"Training complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    
+    return train_loss, train_acc, time_elapsed

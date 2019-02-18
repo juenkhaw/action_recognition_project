@@ -20,9 +20,11 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
         top_acc : top N predicted labels to be considered as predicted results
         
     Outputs:
+        predicted : list of predicted labels for each testing batch
         test_acc : Testing accuracy
+        time_elapsed : Time taken in testing
     """
-    
+    predicted = []
     start = time.time()
     
     if args.verbose2:
@@ -35,9 +37,9 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
         #print(inputs.shape, labels.shape)
         # if loading series of clip, reshaping the inputs tensor to fit into the model
         # from [sample, clips, channel, frame, h, w] to [sample * clips, -1]
+        current_batch_size = inputs.shape[0]
         if load_mode == 'video':
-            current_batch_size = inputs.shape[0]
-            clips_size = inputs.shape[1]
+            clips_per_video = inputs.shape[1]
             inputs = inputs.view(-1, inputs.shape[2], inputs.shape[3], 
                                  inputs.shape[4], inputs.shape[5])
         
@@ -52,10 +54,11 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
         #outputs = np.random.randn(current_batch_size * clips_size, 101)
         
         # average the scores for each classes across all clips that belong to the same video
-        averaged_score = np.average(np.array(np.split(outputs, 2)), axis = 1)
+        averaged_score = np.average(np.array(np.split(outputs, current_batch_size)), axis = 1)
         
         # retrieve the label index with the top-N scores
         top_k_indices = np.argsort(averaged_score, axis = 1)[:, -top_acc:][:, ::-1]
+        predicted.extend(top_k_indices)
         
         # compute number of matches between predicted labels and true labels
         test_correct += np.sum(top_k_indices == np.array(labels))
@@ -67,4 +70,4 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
     time_elapsed = time.time() - start
     print(f"Testing complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
     
-    return test_acc
+    return predicted, test_acc, time_elapsed

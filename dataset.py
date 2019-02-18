@@ -21,7 +21,7 @@ class VideoDataset(Dataset):
     
     Constructor requires:
         dataset : [ucf / hmdb] videoset to be loaded
-        split : [0/1/2/3] split set to be loaded where 0 indicates loading all dataset at once
+        split : [1/2/3] split set to be loaded
         mode : [train / test] training or testing dataset to be loaded
         modelity : [rgb / flow] modality of the videoset to be loaded
         clip_len : [8 / 16] Target depth of training/testing clips
@@ -47,7 +47,7 @@ class VideoDataset(Dataset):
         
         # validate the arguments
         assert(dataset in ['ucf', 'hmdb'])
-        assert(split in list(range(4)))
+        assert(split in list(range(1, 4)))
         assert(mode in ['train', 'test'])
         assert(modality in ['rgb', 'flow'])
         # training should only be done on clips
@@ -64,6 +64,7 @@ class VideoDataset(Dataset):
         txt_files = []
         
         if dataset == 'ucf':
+            # ************CRUCIAL DATASET DIRECTORY*******************
             main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
                 frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
@@ -86,6 +87,7 @@ class VideoDataset(Dataset):
         # reading in the content of mapping text files into a buffer
         buffer_str = []
         for i in range(len(txt_files)):
+            # ************CRUCIAL MAPPING FILE PATH************************
             fo_txt = open(main_dir/txt_files[i], 'r')
             buffer_str.extend((fo_txt.read().split('\n'))[:-1])
         fo_txt.close()
