@@ -19,12 +19,11 @@ from train_net import train_model
 from test_net import test_model
 
 parser = argparse.ArgumentParser(description = 'PyTorch 2.5D Action Recognition ResNet')
-
+# training settings
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('modality', help = 'modality to be trained and validated', choices = ['rgb', 'flow', '2-stream'])
 parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 8, type = int)
 parser.add_argument('-sp', '--split', help = 'dataset split selected in training and evaluating model (0 to train/test on all split)', default = 0, choices = list(range(4)), type = int)
-parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
 parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
@@ -33,19 +32,21 @@ parser.add_argument('-ss', '--step-size', help = 'decaying lr for each [ss] epoc
 parser.add_argument('-gm', '--lr-decay', help = 'lr decaying rate', default = 0.1, type = float)
 parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
 parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
-parser.add_argument('-wn', '--worker-num', help = 'number of workers for some processes (safer to set at 0; -1 set as number of device)', default = 0, type = int)
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
-
+# device and parallelism settings
+parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
+parser.add_argument('-parallel', '--parallel', help = 'activate to run on multiple gpus', action = 'store_true', default = False)
+parser.add_argument('-wn', '--worker-num', help = 'number of workers for some processes (safer to set at 0; -1 set as number of device)', default = 0, type = int)
+# validation settings
 parser.add_argument('-va', '--validation-mode', help = 'activate validation mode', action = 'store_true', default = False)
-
+# testing settings
 parser.add_argument('-runalltest', '--run-all-test', help = 'activate to run all prediction methods to obtain multiple accuracy', action = 'store_true', default = False)
 parser.add_argument('-lm', '--load-mode', help = 'load testing samples as series of clips (video) or a single clip', default = 'clip', choices = ['video', 'clip'])
 parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k predicted labels', default = 1, type = int)
 parser.add_argument('-nclip', '--clips-per-video', help = 'number of clips for testing video in video-level prediction', default = 10, type = int)
-
+# output settings
 parser.add_argument('-save', '--save', help = 'save model and accuracy', action = 'store_true', default = False)
-
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
 
@@ -56,10 +57,11 @@ print(args)
 
 # Allocate device (gpu/cpu) to be used in training and testing
 device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
-num_workers = torch.cuda.device_count() if args.worker_num == -1 else args.worker_num
+num_devices = torch.cuda.device_count() 
+num_workers = num_devices if args.worker_num == -1 else args.worker_num
 
 if args.verbose2:
-    print('Device being used:', device)
+    print(f'Device being used: {device} | device_num {num_devices} | parallelism {args.parallel}')
 
 # intialize the model hyperparameters
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
@@ -92,10 +94,16 @@ for modality, split in itertools.product(modalities, splits):
     # initialize the model
     model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                         in_channels = in_channels[modality], verbose = args.verbose1, 
-                        bn_momentum = args.bn_momentum, bn_epson = args.bn_epson).to(device)
+                        bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
     # initialize the model parameters according to msra_fill initialization
     # DISABLED as it worsens the optimization
     #msra_init(model)
+    
+    # introduces parallelism into the model
+    if args.parallel and num_devices > 1 and ('cuda' in device.type):
+        model = nn.DataParallel(model)
+        
+    model.to(device)
     
     # initialize loss function, optimizer, and scheduler
     criterion = nn.CrossEntropyLoss()

@@ -20,7 +20,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
         dataloaders : dataloader dict containing dataloaders for training (and validation) datasets
         optimizer : optimizer object for parameters learning
         criterion : criterion object for computing loss
-        scheduler (optional) : scheduler object for learning rate decay
+        scheduler : scheduler object for learning rate decay
         
     Outputs:
         train_loss : list of training loss for each epoch
