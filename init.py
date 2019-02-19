@@ -102,6 +102,13 @@ for modality, split in itertools.product(modalities, splits):
     
     # introduces parallelism into the model
     if args.parallel and num_devices > 1 and ('cuda' in device.type):
+        """
+        nn.DataParallel(module, device_ids, output_device, dim)
+        module : module to be parallelized
+        device_ids : default set to list of all available GPUs
+        output_device : default set to device_ids[0]
+        dim : deafult = 0, axis where tensors to be scattered
+        """
         model = nn.DataParallel(model)
         
     model.to(device)
@@ -198,7 +205,7 @@ for modality, split in itertools.product(modalities, splits):
 
 # save the model and details
 if args.save:
-    save_path = 'fyp_r2.5_1704754.pth.tar'
+    save_path = 'fyp_r2.5_1704754_juen.pth.tar'
     torch.save({
             'args' : args,
             'content' : save_content
