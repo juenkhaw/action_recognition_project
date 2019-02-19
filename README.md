@@ -9,11 +9,11 @@ Please run on `init.py` with one of the arguments provided below:
 
 **Test run on gpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -sp 1 -ld 16 -ep 5 -tm -tc 2 -dv gpu -parallel -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv gpu -parallel -runalltest -nclip 2 -v2`
 
 **Test run on cpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -sp 1 -ld 16 -ep 5 -tm -tc 2 -dv cpu -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv cpu -runalltest -nclip 2 -v2`
 
 ### Dataset Path
 
@@ -27,13 +27,13 @@ Please mind the `\\` backslash of the dataset path
 
 The directory outline of RGB frames:
 
-`[dataset]_jpegs_256\jpegs_256\[video_name]`
+`[dataset_path]\[dataset]_jpegs_256\jpegs_256\[video_name]`
 
 **Optical Flow**
 
 The directory of optical flows should contain `u` and `v` optical flows:
 
-`[dataset]_tvl1_flow\tvl1_flow\[u/v]\[video_name]`
+`[dataset_path]\[dataset]_tvl1_flow\tvl1_flow\[u/v]\[video_name]`
 
 **References**
 https://github.com/feichtenhofer/twostreamfusion
@@ -41,6 +41,8 @@ https://github.com/feichtenhofer/twostreamfusion
 ### Parallelism
 
 Pending to be tested on machine with multiple GPUs
+
+If parallelism implementation is causing problems, please run it without `-parallel` tag
 
 **References**
 - https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
