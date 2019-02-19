@@ -27,13 +27,13 @@ Please mind the `\\` backslash of the dataset path
 
 The directory outline of RGB frames:
 
-`[dataset]_jpegs_256\jpegs_256\[video_name]`
+`[dataset_path]\[dataset]_jpegs_256\jpegs_256\[video_name]`
 
 **Optical Flow**
 
 The directory of optical flows should contain `u` and `v` optical flows:
 
-`[dataset]_tvl1_flow\tvl1_flow\[u/v]\[video_name]`
+`[dataset_path]\[dataset]_tvl1_flow\tvl1_flow\[u/v]\[video_name]`
 
 **References**
 https://github.com/feichtenhofer/twostreamfusion
