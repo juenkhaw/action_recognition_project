@@ -71,5 +71,6 @@ Pending to be tested on machine with multiple GPUs
 
 ### Implementation References
 
+- A Closer Look at Spatiotemporal Convolutions for Action Recognition https://arxiv.org/abs/1711.11248
 - https://github.com/facebookresearch/VMZ
 - https://github.com/irhumshafkat/R2Plus1D-PyTorch
