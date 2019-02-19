@@ -42,6 +42,8 @@ https://github.com/feichtenhofer/twostreamfusion
 
 Pending to be tested on machine with multiple GPUs
 
+If parallelism implementation is causing problems, please run it without `-parallel` tag
+
 **References**
 - https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
 - https://pytorch.org/tutorials/beginner/former_torchies/parallelism_tutorial.html
