@@ -61,9 +61,6 @@ class VideoDataset(Dataset):
             
         dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
         
-        # locate the video <-> label mapping text files
-        txt_files = []
-        
         # ************CRUCIAL DATASET DIRECTORY*******************
         main_dir = Path(path)
         if dataset == 'ucf':
@@ -81,19 +78,12 @@ class VideoDataset(Dataset):
             else:
                 frame_dir = Path(main_dir/'hmdb51_tvl1_flow'/'tvl1_flow')
         
-        # appends mapping from all splits if loading of whole dataset is intended
-        if split == 0:
-            for i in range(3):
-                txt_files.append(dataset + '_' + mode + 'list0' + str(i + 1) + '.txt')
-        else:
-            txt_files.append(dataset + '_' + mode + 'list0' + str(split) + '.txt')
+        txt_file = dataset + '_' + mode + 'list0' + str(split) + '.txt'
             
         # reading in the content of mapping text files into a buffer
-        buffer_str = []
-        for i in range(len(txt_files)):
-            # ************CRUCIAL MAPPING FILE PATH************************
-            fo_txt = open(Path(r'mapping/' + dataset_name[dataset])/txt_files[i], 'r')
-            buffer_str.extend((fo_txt.read().split('\n'))[:-1])
+        # ************CRUCIAL MAPPING FILE PATH************************
+        fo_txt = open(Path(r'mapping/' + dataset_name[dataset])/txt_file, 'r')
+        buffer_str = (fo_txt.read().split('\n'))[:-1]
         fo_txt.close()
         
         # organize raw strings mapping into X and y np arrays
@@ -136,7 +126,7 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 2, 'train', 'flow', test_mode = False)
+    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 3, 'train', 'rgb', test_mode = False)
     img, _ = test.__getitem__(0)
     
 #    for i in range(img.shape[1]):
