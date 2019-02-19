@@ -9,11 +9,11 @@ Please run on `init.py` with one of the arguments provided below:
 
 **Test run on gpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -sp 1 -ld 16 -ep 5 -tm -tc 2 -dv gpu -parallel -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv gpu -parallel -runalltest -nclip 2 -v2`
 
 **Test run on cpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -sp 1 -ld 16 -ep 5 -tm -tc 2 -dv cpu -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv cpu -runalltest -nclip 2 -v2`
 
 ### Dataset Path
 
