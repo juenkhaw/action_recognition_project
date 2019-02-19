@@ -22,6 +22,7 @@ parser = argparse.ArgumentParser(description = 'PyTorch 2.5D Action Recognition 
 # training settings
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('modality', help = 'modality to be trained and validated', choices = ['rgb', 'flow', '2-stream'])
+parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 8, type = int)
 parser.add_argument('-sp', '--split', help = 'dataset split selected in training and evaluating model (0 to train/test on all split)', default = 0, choices = list(range(4)), type = int)
 parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
@@ -113,11 +114,11 @@ for modality, split in itertools.product(modalities, splits):
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = args.step_size, gamma = args.lr_decay)
     
     # prepare the training datasets and validation datasets (if have)
-    train_dataloader = DataLoader(VideoDataset(args.dataset, split, 'train', modality, 
+    train_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'train', modality, 
                                                clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                                   batch_size = args.batch_size, shuffle = True, num_workers = num_workers)
     
-    val_dataloader = DataLoader(VideoDataset(args.dataset, split, 'test', modality, 
+    val_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'test', modality, 
                                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                                 batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
     
@@ -161,7 +162,7 @@ for modality, split in itertools.product(modalities, splits):
             continue
     
         # initialize testing dataset for clip/video level predictions
-        test_dataloader = DataLoader(VideoDataset(args.dataset, split, 'test', modality, 
+        test_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'test', modality, 
                                                  clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt,
                                                  load_mode = level, clips_per_video = args.clips_per_video if level == 'video' else 1), 
                                     batch_size = args.batch_size, num_workers = num_workers, shuffle = False)

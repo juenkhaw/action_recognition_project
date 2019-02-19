@@ -29,7 +29,7 @@ class VideoDataset(Dataset):
         test_amt : Amount of labelled samples to be used if test_mode is activated
     """
     
-    def __init__(self, dataset, split, mode, modality, clip_len = 16, 
+    def __init__(self, path, dataset, split, mode, modality, clip_len = 16, 
                  test_mode = True, test_amt = 8, 
                  load_mode = 'clip', clips_per_video = 1):
    
@@ -58,20 +58,24 @@ class VideoDataset(Dataset):
             assert(clips_per_video == 1)
         else:
             assert(clips_per_video > 1)
-        
+            
+        dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
         
         # locate the video <-> label mapping text files
         txt_files = []
         
+        # ************CRUCIAL DATASET DIRECTORY*******************
+        main_dir = Path(path)
         if dataset == 'ucf':
             # ************CRUCIAL DATASET DIRECTORY*******************
-            main_dir = Path(r'..\dataset\UCF-101')
+            #main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
                 frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
             else:
                 frame_dir = Path(main_dir/'ucf101_tvl1_flow'/'tvl1_flow')
         else:
-            main_dir = Path(r'..\dataset\HMDB-51')
+            #main_dir = Path(r'..\dataset\HMDB-51')
+            # ************CRUCIAL DATASET DIRECTORY*******************
             if self._modality == 'rgb':
                 frame_dir = Path(main_dir/'hmdb51_jpegs_256'/'jpegs_256')
             else:
@@ -88,7 +92,7 @@ class VideoDataset(Dataset):
         buffer_str = []
         for i in range(len(txt_files)):
             # ************CRUCIAL MAPPING FILE PATH************************
-            fo_txt = open(main_dir/txt_files[i], 'r')
+            fo_txt = open(Path(r'mapping/' + dataset_name[dataset])/txt_files[i], 'r')
             buffer_str.extend((fo_txt.read().split('\n'))[:-1])
         fo_txt.close()
         
@@ -132,7 +136,7 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset('hmdb', 1, 'test', 'flow', test_mode = False, load_mode = 'video', clips_per_video = 10)
+    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 2, 'train', 'flow', test_mode = False)
     img, _ = test.__getitem__(0)
     
 #    for i in range(img.shape[1]):
