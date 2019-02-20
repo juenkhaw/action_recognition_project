@@ -198,7 +198,7 @@ for modality, split in itertools.product(modalities, splits):
                 'train_loss' : train_loss,
                 'train_elapsed' : train_elapsed,
                 'state_dict' : model.state_dict(),
-                #'opt_dict': optimizer.state_dict(),
+                'opt_dict': optimizer.state_dict(),
                 'testing_content' : testing_content
             }
         })
