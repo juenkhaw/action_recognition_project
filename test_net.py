@@ -68,6 +68,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
     
     # display the time elapsed in testing
     time_elapsed = time.time() - start
-    print(f"Testing complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
-    
+    #print(f"Testing complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    print("Testing complete in %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
+
     return predicted, test_acc, time_elapsed

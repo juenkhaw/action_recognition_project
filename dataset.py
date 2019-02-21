@@ -128,7 +128,8 @@ class VideoDataset(Dataset):
 if __name__ == '__main__':
     test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 3, 'train', 'rgb', test_mode = False)
     img, _ = test.__getitem__(0)
-    
+    print(test.len)
+    print(img.shape)
 #    for i in range(img.shape[1]):
 #        frame = img[:, i, :, :].transpose(1, 2, 0)
 #        cv2.imshow('buffer', frame)

@@ -43,7 +43,7 @@ parser.add_argument('-wn', '--worker-num', help = 'number of workers for some pr
 parser.add_argument('-va', '--validation-mode', help = 'activate validation mode', action = 'store_true', default = False)
 # testing settings
 parser.add_argument('-runalltest', '--run-all-test', help = 'activate to run all prediction methods to obtain multiple accuracy', action = 'store_true', default = False)
-parser.add_argument('-lm', '--load-mode', help = 'load testing samples as series of clips (video) or a single clip', default = 'clip', choices = ['video', 'clip'])
+parser.add_argument('-lm', '--load-mode', help = 'load testing samples as series of clips (video) or a single clip', default = 'video', choices = ['video', 'clip'])
 parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k predicted labels', default = 1, type = int)
 parser.add_argument('-nclip', '--clips-per-video', help = 'number of clips for testing video in video-level prediction', default = 10, type = int)
 # output settings
@@ -90,7 +90,8 @@ splits = [args.split] if args.split != 0 else list(range(1, 4))
 for modality, split in itertools.product(modalities, splits):
     
     if args.verbose2:
-        print(f'****** Current task: dataset {args.dataset} | modality {modality} | split {split}')
+        #print(f'****** Current task: dataset {args.dataset} | modality {modality} | split {split}')
+        print('****** Current task: dataset ',args.dataset,' | modality ',modality,' | split ',split)
     
     # initialize the model
     model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
@@ -150,6 +151,7 @@ for modality, split in itertools.product(modalities, splits):
         if args.validation_mode:
             print('###### Dataset loaded:', ' training samples', len(train_dataloader.dataset), '| validation samples', 
                   len(val_dataloader.dataset))
+            
         else:
             print('###### Dataset loaded:', ' training samples', len(train_dataloader.dataset), '| validation samples None')
     
@@ -158,7 +160,8 @@ for modality, split in itertools.product(modalities, splits):
             args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
     
     # prepare for testing with method selected
-    pred_levels = [args.load_mode] if not args.run_all_test else ['clip', 'video']
+    # removed clip-level prediction if -runalltest
+    pred_levels = [args.load_mode] if not args.run_all_test else ['video']
     top_acc = [args.top_acc] if not args.run_all_test else [1, 5]
     
     testing_content = {}
@@ -175,9 +178,11 @@ for modality, split in itertools.product(modalities, splits):
                                     batch_size = args.batch_size, num_workers = num_workers, shuffle = False)
                 
         if args.verbose2:
-            print(f'####### Dataset loaded: testing samples {len(test_dataloader.dataset)}')
-            print(f'####### Current Testing method: prediction-level {level} | top {top}')
-        
+#            print(f'####### Dataset loaded: testing samples {len(test_dataloader.dataset)}')
+#            print(f'####### Current Testing method: prediction-level {level} | top {top}')
+            print('####### Dataset loaded: testing samples ',len(test_dataloader.dataset))
+            print('####### Current Testing method: prediction-level ',level,' | top' ,top)
+
         # use the trained model to predict X_test
         predicted, test_acc, test_elapsed = test_model(
                 args, device, model, test_dataloader, load_mode = level, top_acc = top)

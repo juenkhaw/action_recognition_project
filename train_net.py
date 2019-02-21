@@ -90,10 +90,12 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
             train_acc.append(epoch_acc)
             
             if args.verbose2:
-                print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
+                #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
+                print('Epoch %d | Phase %s | Loss %.4f | Accuracy %.2f' % (epoch, phase, epoch_loss, epoch_acc))
     
     # display the time elapsed
     time_elapsed = time.time() - start    
-    print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
     
     return train_loss, train_acc, time_elapsed
