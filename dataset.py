@@ -67,9 +67,9 @@ class VideoDataset(Dataset):
             # ************CRUCIAL DATASET DIRECTORY*******************
             #main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
+                frame_dir = Path(main_dir/'rgb'/'jpegs_256')
             else:
-                frame_dir = Path(main_dir/'ucf101_tvl1_flow'/'tvl1_flow')
+                frame_dir = Path(main_dir/'flow'/'tvl1_flow')
         else:
             #main_dir = Path(r'..\dataset\HMDB-51')
             # ************CRUCIAL DATASET DIRECTORY*******************
