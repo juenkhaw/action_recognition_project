@@ -1,0 +1,354 @@
+R2Plus1DNet(
+  (net): Sequential(
+    (conv1): SpatioTemporalConv(
+      (spatial_conv): Conv3D(
+        (conv): Sequential(
+          (spatial_conv): Conv3d(2, 45, kernel_size=[1, 7, 7], stride=[1, 2, 2], bias=False)
+          (spatial_bn): BatchNorm3d(45, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          (spatial_relu): ReLU()
+        )
+      )
+      (temporal_conv): Conv3D(
+        (conv): Sequential(
+          (temporal_conv): Conv3d(45, 64, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+          (temporal_bn): BatchNorm3d(64, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          (temporal_relu): ReLU()
+        )
+      )
+    )
+    (conv2_x): SpatioTemporalResModule(
+      (res_module): Sequential(
+        (conv2_1): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv2_1_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(64, 144, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(144, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(144, 64, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv2_1_bn1): BatchNorm3d(64, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv2_1_relu1): ReLU()
+            (conv2_1_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(64, 144, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(144, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(144, 64, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv2_1_bn2): BatchNorm3d(64, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv2_1_relu_out): ReLU()
+          )
+        )
+        (conv2_2): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv2_2_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(64, 144, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(144, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(144, 64, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv2_2_bn1): BatchNorm3d(64, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv2_2_relu1): ReLU()
+            (conv2_2_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(64, 144, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(144, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(144, 64, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv2_2_bn2): BatchNorm3d(64, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv2_2_relu_out): ReLU()
+          )
+        )
+      )
+    )
+    (conv3_x): SpatioTemporalResModule(
+      (res_module): Sequential(
+        (conv3_1): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv3_1_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(64, 230, kernel_size=[1, 3, 3], stride=[1, 2, 2], bias=False)
+                  (spatial_bn): BatchNorm3d(230, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(230, 128, kernel_size=[3, 1, 1], stride=[2, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv3_1_bn1): BatchNorm3d(128, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv3_1_relu1): ReLU()
+            (conv3_1_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(128, 288, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(288, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(288, 128, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv3_1_bn2): BatchNorm3d(128, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv3_1_relu_out): ReLU()
+          )
+          (downsample_block): Sequential(
+            (conv3_1_downsample_1x1x1_conv): Conv3d(64, 128, kernel_size=[1, 1, 1], stride=[2, 2, 2], bias=False)
+            (conv3_1_downsample_bn): BatchNorm3d(128, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+        )
+        (conv3_2): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv3_2_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(128, 288, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(288, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(288, 128, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv3_2_bn1): BatchNorm3d(128, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv3_2_relu1): ReLU()
+            (conv3_2_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(128, 288, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(288, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(288, 128, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv3_2_bn2): BatchNorm3d(128, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv3_2_relu_out): ReLU()
+          )
+        )
+      )
+    )
+    (conv4_x): SpatioTemporalResModule(
+      (res_module): Sequential(
+        (conv4_1): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv4_1_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(128, 460, kernel_size=[1, 3, 3], stride=[1, 2, 2], bias=False)
+                  (spatial_bn): BatchNorm3d(460, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(460, 256, kernel_size=[3, 1, 1], stride=[2, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv4_1_bn1): BatchNorm3d(256, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv4_1_relu1): ReLU()
+            (conv4_1_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(256, 576, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(576, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(576, 256, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv4_1_bn2): BatchNorm3d(256, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv4_1_relu_out): ReLU()
+          )
+          (downsample_block): Sequential(
+            (conv4_1_downsample_1x1x1_conv): Conv3d(128, 256, kernel_size=[1, 1, 1], stride=[2, 2, 2], bias=False)
+            (conv4_1_downsample_bn): BatchNorm3d(256, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+        )
+        (conv4_2): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv4_2_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(256, 576, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(576, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(576, 256, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv4_2_bn1): BatchNorm3d(256, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv4_2_relu1): ReLU()
+            (conv4_2_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(256, 576, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(576, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(576, 256, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv4_2_bn2): BatchNorm3d(256, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv4_2_relu_out): ReLU()
+          )
+        )
+      )
+    )
+    (conv5_x): SpatioTemporalResModule(
+      (res_module): Sequential(
+        (conv5_1): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv5_1_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(256, 921, kernel_size=[1, 3, 3], stride=[1, 2, 2], bias=False)
+                  (spatial_bn): BatchNorm3d(921, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(921, 512, kernel_size=[3, 1, 1], stride=[2, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv5_1_bn1): BatchNorm3d(512, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv5_1_relu1): ReLU()
+            (conv5_1_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(512, 1152, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(1152, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(1152, 512, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv5_1_bn2): BatchNorm3d(512, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv5_1_relu_out): ReLU()
+          )
+          (downsample_block): Sequential(
+            (conv5_1_downsample_1x1x1_conv): Conv3d(256, 512, kernel_size=[1, 1, 1], stride=[2, 2, 2], bias=False)
+            (conv5_1_downsample_bn): BatchNorm3d(512, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+        )
+        (conv5_2): SpatioTemporalResBlock(
+          (res_block): Sequential(
+            (conv5_2_conv1): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(512, 1152, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(1152, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(1152, 512, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv5_2_bn1): BatchNorm3d(512, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+            (conv5_2_relu1): ReLU()
+            (conv5_2_conv2): SpatioTemporalConv(
+              (spatial_conv): Conv3D(
+                (conv): Sequential(
+                  (spatial_conv): Conv3d(512, 1152, kernel_size=[1, 3, 3], stride=[1, 1, 1], bias=False)
+                  (spatial_bn): BatchNorm3d(1152, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+                  (spatial_relu): ReLU()
+                )
+              )
+              (temporal_conv): Conv3D(
+                (conv): Sequential(
+                  (temporal_conv): Conv3d(1152, 512, kernel_size=[3, 1, 1], stride=[1, 1, 1], bias=False)
+                )
+              )
+            )
+            (conv5_2_bn2): BatchNorm3d(512, eps=0.001, momentum=0.1, affine=True, track_running_stats=True)
+          )
+          (relu): Sequential(
+            (conv5_2_relu_out): ReLU()
+          )
+        )
+      )
+    )
+  )
+  (avgpool): AdaptiveAvgPool3d(output_size=1)
+  (linear1): Linear(in_features=512, out_features=101, bias=True)
+)

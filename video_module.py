@@ -8,6 +8,7 @@ Created on Mon Feb  4 16:13:01 2019
 import os
 import numpy as np
 import cv2
+import glob
 
 def temporal_crop(buffer_len, clip_len):
     """
@@ -42,14 +43,13 @@ def temporal_uniform_crop(buffer_len, clip_len, clips_per_video):
     
     # compute the average spacing between each consecutive clips
     # could be negative if buffer_len < clip_len * clips_per_video
-    spacing = int((buffer_len - clip_len * clips_per_video) / (clips_per_video - 1))
+    spacing = (buffer_len - clip_len * clips_per_video) // (clips_per_video - 1)
     
-    indices = [(0, clip_len - 1)]
-    for i in range(1, clips_per_video - 1):
-        start = indices[i - 1][1] + spacing + 1
-        end = start + clip_len - 1
+    indices = [(0, clip_len)]
+    for i in range(1, clips_per_video):
+        start = indices[i - 1][1] + spacing
+        end = start + clip_len
         indices.append((start, end))
-    indices.append((buffer_len - clip_len, buffer_len - 1))
     
     return indices
 
@@ -149,7 +149,8 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     # read path content and sample frame
     path_content = []
     for i in range(len(frames_path)):
-        path_content.append(os.listdir(frames_path[i]))
+        #path_content.append(os.listdir(frames_path[i]))
+        path_content.append(glob.glob(frames_path[i] + '/*.jpg'))
     #sample_frame = cv2.imread(frames_path + '/' + path_content[1], cv2.IMREAD_GRAYSCALE)
     
     # retrieve frame properties
@@ -183,12 +184,18 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             buffer_frame = []
             
             if frame_chn == 3:
-                buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
+                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
+                buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_COLOR))
                 buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
                 
             else:
-                buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                #print(count)
+                #print(path_content[0][count])
+                #print(path_content[1][count])
+                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
                 
             for i in range(len(buffer_frame)):
                 
@@ -227,11 +234,15 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
     
 if __name__ == '__main__':
-    #video_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_BasketballDunk_g20_c06'
-    video_path = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\u\v_BasketballDunk_g20_c06'
-    video_path2 = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\v\v_BasketballDunk_g20_c06'
-    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 16, mode = 'video', clips_per_video = 10)
-    cv2.imshow('buffer0', buffer[2, 0, 0, :, :])
-    cv2.imshow('buffer1', buffer[2, 1, 0, :, :])
+    video_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_BasketballDunk_g20_c06'
+    #video_path = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\u\v_BasketballDunk_g20_c06'
+    #video_path2 = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\v\v_BasketballDunk_g20_c06'
+    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 16, mode = 'video', clips_per_video = 10)
+    buffer = buffer.transpose((0, 2, 3, 4, 1))
+#    buffer_chnl = buffer[:, :, :, :, 2]
+#    buffer[:, :, :, :, 2] = buffer[:, :, :, :, 0]
+#    buffer[:, :, :, :, 0] = buffer_chnl
+    cv2.imshow('buffer0', buffer[1, 3, :, :, :])
+    #cv2.imshow('buffer1', buffer[2, 1, 0, :, :])
     cv2.waitKey(0)
     cv2.destroyAllWindows()

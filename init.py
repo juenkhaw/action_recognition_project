@@ -107,6 +107,7 @@ for modality, split in itertools.product(modalities, splits):
         nn.DataParallel(module, device_ids, output_device, dim)
         module : module to be parallelized
         device_ids : default set to list of all available GPUs
+        the first in the device_ids list would be cuda:0 as default, could set other gpu as host
         output_device : default set to device_ids[0]
         dim : deafult = 0, axis where tensors to be scattered
         """

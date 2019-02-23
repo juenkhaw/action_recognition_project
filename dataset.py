@@ -11,7 +11,7 @@ import numpy as np
 import random
 import cv2
 
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, DataLoader
 
 from video_module import load_clips
 
@@ -67,9 +67,9 @@ class VideoDataset(Dataset):
             # ************CRUCIAL DATASET DIRECTORY*******************
             #main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'rgb'/'jpegs_256')
+                frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
             else:
-                frame_dir = Path(main_dir/'flow'/'tvl1_flow')
+                frame_dir = Path(main_dir/'ucf101_tvl1_flow'/'tvl1_flow')
         else:
             #main_dir = Path(r'..\dataset\HMDB-51')
             # ************CRUCIAL DATASET DIRECTORY*******************
@@ -126,10 +126,34 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 3, 'train', 'rgb', test_mode = False)
-    img, _ = test.__getitem__(0)
-    print(test.len)
-    print(img.shape)
+    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
+                        load_mode = 'video', clips_per_video = 10)
+    test_loader = DataLoader(test, batch_size = 1)
+
+    test.__getitem__(208)
+    
+    length = test.__len__()
+    for i in range(length):
+        try:
+            print(str(i) + '/' + str(length) + '\r')
+            test.__getitem__(i)
+        except:
+            print(i, test._clip_names[i][0], test._labels[i])
+            break
+        
+    #for x, y in test_loader:
+    #    print(i, x.shape, y)
+    #    i += 1
+    
+#    for i in range(0, 10):
+#        img, y = test.__getitem__(i)
+#        print(len(test))
+#        print(img.shape)
+#        print(np.min(img), np.max(img))
+#        print(y)
+#        frame = img[:, 0, :, :].transpose(1, 2, 0)
+#        cv2.imshow('buffer', frame)
+#        cv2.waitKey(0)
 #    for i in range(img.shape[1]):
 #        frame = img[:, i, :, :].transpose(1, 2, 0)
 #        cv2.imshow('buffer', frame)
