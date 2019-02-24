@@ -6,7 +6,6 @@ Created on Mon Feb  4 16:09:32 2019
 """
 
 import os
-from pathlib import Path
 import numpy as np
 import random
 import cv2
@@ -62,27 +61,27 @@ class VideoDataset(Dataset):
         dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
         
         # ************CRUCIAL DATASET DIRECTORY*******************
-        main_dir = Path(path)
+        main_dir = path
         if dataset == 'ucf':
             # ************CRUCIAL DATASET DIRECTORY*******************
             #main_dir = Path(r'..\dataset\UCF-101')
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'ucf101_jpegs_256'/'jpegs_256')
+                frame_dir = main_dir + '/ucf101_jpegs_256/jpegs_256'
             else:
-                frame_dir = Path(main_dir/'ucf101_tvl1_flow'/'tvl1_flow')
+                frame_dir = main_dir + '/ucf101_tvl1_flow/tvl1_flow'
         else:
             #main_dir = Path(r'..\dataset\HMDB-51')
             # ************CRUCIAL DATASET DIRECTORY*******************
             if self._modality == 'rgb':
-                frame_dir = Path(main_dir/'hmdb51_jpegs_256'/'jpegs_256')
+                frame_dir = main_dir + '/hmdb51_jpegs_256/jpegs_256'
             else:
-                frame_dir = Path(main_dir/'hmdb51_tvl1_flow'/'tvl1_flow')
+                frame_dir = main_dir + '/hmdb51_tvl1_flow/tvl1_flow'
         
         txt_file = dataset + '_' + mode + 'list0' + str(split) + '.txt'
             
         # reading in the content of mapping text files into a buffer
         # ************CRUCIAL MAPPING FILE PATH************************
-        fo_txt = open(Path(r'mapping/' + dataset_name[dataset])/txt_file, 'r')
+        fo_txt = open('mapping/' + dataset_name[dataset] + '/' + txt_file, 'r')
         buffer_str = (fo_txt.read().split('\n'))[:-1]
         fo_txt.close()
         
@@ -126,20 +125,20 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 if __name__ == '__main__':
-    test = VideoDataset(r'..\dataset\UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
+    test = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
                         load_mode = 'video', clips_per_video = 10)
     test_loader = DataLoader(test, batch_size = 1)
 
     test.__getitem__(208)
     
-    length = test.__len__()
-    for i in range(length):
-        try:
-            print(str(i) + '/' + str(length) + '\r')
-            test.__getitem__(i)
-        except:
-            print(i, test._clip_names[i][0], test._labels[i])
-            break
+#    length = test.__len__()
+#    for i in range(length):
+#        try:
+#            print(str(i) + '/' + str(length) + '\r')
+#            test.__getitem__(i)
+#        except:
+#            print(i, test._clip_names[i][0], test._labels[i])
+#            break
         
     #for x, y in test_loader:
     #    print(i, x.shape, y)

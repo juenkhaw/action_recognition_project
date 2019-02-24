@@ -5,7 +5,6 @@ Created on Mon Feb  4 16:13:01 2019
 @author: Juen
 """
 
-import os
 import numpy as np
 import cv2
 import glob
@@ -234,9 +233,9 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
     
 if __name__ == '__main__':
-    video_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_BasketballDunk_g20_c06'
-    #video_path = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\u\v_BasketballDunk_g20_c06'
-    #video_path2 = r'..\dataset\UCF-101\ucf101_tvl1_flow\tvl1_flow\v\v_BasketballDunk_g20_c06'
+    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
+    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
+    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
     buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 16, mode = 'video', clips_per_video = 10)
     buffer = buffer.transpose((0, 2, 3, 4, 1))
 #    buffer_chnl = buffer[:, :, :, :, 2]

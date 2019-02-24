@@ -5,3 +5,7 @@ __pycache__/video_module.cpython-37.pyc
 *.pyc
 trainer.py
 *.tar
+blobs.txt
+keys.txt
+ld-34.txt
+untitled0.py
