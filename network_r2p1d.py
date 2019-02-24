@@ -198,8 +198,16 @@ class R2Plus1DNet(nn.Module):
         verbose : prints activation output size after each phases or not
     """
     
+    VALID_ENDPOINTS = (
+        'Conv3d_1_3x7x7',
+        'Conv3d_2_x',
+        'Conv3d_3_x',
+        'Conv3d_4_x',
+        'Conv3d_5_x'
+    )
+    
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
-                 in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = 'True'):
+                 in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True):
             
         super(R2Plus1DNet, self).__init__()
         
@@ -275,7 +283,7 @@ class R2Plus1DNet(nn.Module):
         return x    
 
 if __name__ is '__main__':
-    device = torch.device('cpu')
+    device = torch.device('gpu')
     model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2, verbose = True).to(device)
     #module.model_summary(model)
     #module.msra_init(model)

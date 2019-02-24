@@ -93,10 +93,10 @@ class VideoDataset(Dataset):
             buffer_map = buffer_str[i].split(' ')
             self._clip_names.append([])
             if self._modality == 'rgb':
-                self._clip_names[i].append(os.path.join(frame_dir, buffer_map[0].split('.')[0]))
+                self._clip_names[i].append(frame_dir + '/' + buffer_map[0].split('.')[0])
             else:
-                self._clip_names[i].append(os.path.join(frame_dir, 'u', buffer_map[0].split('.')[0]))
-                self._clip_names[i].append(os.path.join(frame_dir, 'v', buffer_map[0].split('.')[0]))
+                self._clip_names[i].append(frame_dir + '/u/' + buffer_map[0].split('.')[0])
+                self._clip_names[i].append(frame_dir + '/v/' + buffer_map[0].split('.')[0])
             labels.append(buffer_map[1])
         
         # convert the labels list into an np array
@@ -104,7 +104,8 @@ class VideoDataset(Dataset):
         
         # implement test mode to extremely scale down the dataset
         if test_mode:
-            indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
+            #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
+            indices = list(range(test_amt))
             self._clip_names = (np.array(self._clip_names))[indices]
             self._labels = self._labels[indices]
             #for i in range(test_amt):
@@ -112,6 +113,7 @@ class VideoDataset(Dataset):
         
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
+        #print(index)
         buffer = load_clips(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
                                          self._crop_height, self._crop_width, self._crop_depth, 
@@ -124,12 +126,52 @@ class VideoDataset(Dataset):
         assert(len(self._clip_names) == len(self._labels))
         return len(self._labels)
     
+class TwoStreamDataset(Dataset):
+    
+    def __init__(self, path, dataset, split, mode, clip_len = 16, 
+                 test_mode = True, test_amt = 8, 
+                 load_mode = 'clip', clips_per_video = 1):
+        
+        self._rgb_set = VideoDataset(path, dataset, split, mode, 'rgb', clip_len = clip_len, 
+                                     test_mode = test_mode, test_amt = test_amt, 
+                                     load_mode = load_mode, clips_per_video = clips_per_video)
+        
+        self._flow_set = VideoDataset(path, dataset, split, mode, 'flow', clip_len = clip_len, 
+                                     test_mode = test_mode, test_amt = test_amt, 
+                                     load_mode = load_mode, clips_per_video = clips_per_video)
+        
+    def __getitem__(self, index):
+        rgbX, rgbY = self._rgb_set.__getitem__(index)
+        flowX, flowY = self._flow_set.__getitem__(index)
+        #print(self._rgb_set._clip_names[index], self._flow_set._clip_names[index])
+        return rgbX, flowX, rgbY
+    
+    def __len__(self):
+        assert(self._rgb_set.__len__() == self._flow_set.__len__())
+        return self._rgb_set.__len__()
+    
 if __name__ == '__main__':
-    test = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
-                        load_mode = 'video', clips_per_video = 10)
-    test_loader = DataLoader(test, batch_size = 1)
-
-    test.__getitem__(208)
+    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = True, 
+                        test_amt = 8, load_mode = 'clip')
+    trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)
+    
+#    for x1, x2, y in trainlaoder:
+#        pass
+#        print(x1.shape, x2.shape, y)
+    
+#    train1 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'train', 'rgb', test_mode = True, 
+#                        test_amt = 8, load_mode = 'clip')
+#    train2 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'train', 'flow', test_mode = True, 
+#                        test_amt = 8, load_mode = 'clip')
+#    trainloader1 = DataLoader(train1, batch_size = 2, shuffle = True)
+#    trainloader2 = DataLoader(train2, batch_size = 2, shuffle = True)
+#
+#    for vol1, vol2 in zip(trainloader1, trainloader2):
+#        pass
+#        #print(vol1[0].shape, vol1[1])
+#        #print(vol2[0].shape, vol2[1])
+    
+    #test.__getitem__(208)
     
 #    length = test.__len__()
 #    for i in range(length):
