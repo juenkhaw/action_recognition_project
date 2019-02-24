@@ -27,28 +27,26 @@ Please run on `init.py` with one of the arguments provided below:
 
 Please input path to the directory containing the rgb frames and optical flows as `dataset_path` 
 
-Example: `..\\dataset\\UCF-101`
-
-Please mind the `\\` backslash of the dataset path
+Example: `../dataset/UCF-101`
 
 **RGB Frame**
 
 The directory outline of RGB frames:
 
-`[dataset_path]\[dataset]_jpegs_256\jpegs_256\[video_name]`
+`[dataset_path]/[dataset]_jpegs_256/jpegs_256/[video_name]`
 
 **Optical Flow**
 
 The directory of optical flows should contain `u` and `v` optical flows:
 
-`[dataset_path]\[dataset]_tvl1_flow\tvl1_flow\[u/v]\[video_name]`
+`[dataset_path]/[dataset]_tvl1_flow/tvl1_flow/[u/v]/[video_name]`
 
 **References**
 https://github.com/feichtenhofer/twostreamfusion
 
 ### Parallelism
 
-Pending to be tested on machine with multiple GPUs
+Turns out as suspect in causing machine to crash, pending to try on not setting host GPU `cuda:0` as the gatherer
 
 If parallelism implementation is causing problems, please run it without `-parallel` tag
 
