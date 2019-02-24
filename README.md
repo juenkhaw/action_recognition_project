@@ -3,17 +3,25 @@
 
 Please run on `init.py` with one of the arguments provided below:
 
-**Official run**
+**Training from scratch (two-stream)**
 
-`ucf 2-stream [dataset_path] -cl 16 -ld 34 -parallel -runalltest -nclip 10 -save -v2`
+`ucf 2-stream [dataset_path] -fusion average -cl 8 -ld 18 -parallel -train -test -runalltest -nclip 10 -save -v2`
+
+**Training from scratch (single-modality)**
+
+`ucf [2-stream/rgb/flow] [dataset_path] -cl 8 -ld 18 -parallel -train -test -runalltest -nclip 10 -save -v2`
+
+**With pre-trained model (Testing only)'
+
+`ucf 2-stream [dataset_path] -fusion average -cl 8 -ld 18 -parallel -test -runalltest -nclip 10 -save -v2 -loadmodel [model_path]`
 
 **Test run on gpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv gpu -parallel -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 18 -ep 5 -tm -tc 2 -dv gpu -parallel -train -test -runalltest -nclip 2 -v2`
 
 **Test run on cpu**
 
-`ucf 2-stream [dataset_path] -cl 8 -ld 16 -ep 5 -tm -tc 2 -dv cpu -runalltest -nclip 2 -v2`
+`ucf 2-stream [dataset_path] -cl 8 -ld 18 -ep 5 -tm -tc 2 -dv cpu -train -test -runalltest -nclip 2 -v2`
 
 ### Dataset Path
 
@@ -63,10 +71,22 @@ If parallelism implementation is causing problems, please run it without `-paral
 - `-lr` initial learning rate (alpha) for updating parameters | default = 0.01
 - `-ss` decaying lr for each [ss] epoches | default = 10
 - `-gm` lr decaying rate | default = 0.1
-- `-tm` activate test mode to minimize dataset for debugging purpose | default = False
-- `-tc` number of labelled samples to be left when test mode is activated | default = 2
 - `-mo` momemntum for batch normalization | default = 0.1
 - `-es` epson for batch normalization | default = 1e-3
+
+**Fusion method**
+
+- `-fusion` fusion method to be used | default = 'none' | choices = ['none', 'average']
+
+**Debugging mode**
+
+- `-tm` activate test mode to minimize dataset for debugging purpose | default = False
+- `-tc` number of labelled samples to be left when test mode is activated | default = 2
+
+**Pre-training**
+
+- `-train` activate to train the model | default = False
+- `-loadmodel` path to the pretrained model state_dict | default = None
 
 **Device and parallelism**
 
@@ -76,6 +96,8 @@ If parallelism implementation is causing problems, please run it without `-paral
 
 **Testing**
 
+- `-test` activate to evaluate the model | default = False
+- `-tbs` number of sample in each testing batch | default = 1
 - `-runalltest` activate to run all prediction methods to obtain multiple accuracy | default = False
 - `-lm` load testing samples as series of clips (video) or a single clip | default = 'clip' | choices = ['video', 'clip']
 - `-topk`comapre true labels with top-k predicted labels | default = 1
