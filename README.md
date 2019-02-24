@@ -11,7 +11,7 @@ Please run on `init.py` with one of the arguments provided below:
 
 `ucf [2-stream/rgb/flow] [dataset_path] -cl 8 -ld 18 -parallel -train -test -runalltest -nclip 10 -save -v2`
 
-**With pre-trained model (Testing only)'
+**With pre-trained model (Testing only)**
 
 `ucf 2-stream [dataset_path] -fusion average -cl 8 -ld 18 -parallel -test -runalltest -nclip 10 -save -v2 -loadmodel [model_path]`
 
