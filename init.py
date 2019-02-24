@@ -5,15 +5,15 @@ Created on Mon Feb 11 21:45:34 2019
 @author: Juen
 """
 import argparse
-import numpy as np
 import itertools
 
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
 
-from dataset import VideoDataset
+from dataset import VideoDataset, TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
+from fusion_network import FusionNet
 from train_net import train_model
 from test_net import test_model
 
@@ -32,6 +32,8 @@ parser.add_argument('-ss', '--step-size', help = 'decaying lr for each [ss] epoc
 parser.add_argument('-gm', '--lr-decay', help = 'lr decaying rate', default = 0.1, type = float)
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
+# fusion settings
+parser.add_argument('-fusion', '--fusion', help = 'Fusion method to be used', default = 'none', choices = ['none', 'average'])
 # debugging mode settings
 parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
 parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
@@ -57,37 +59,45 @@ parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of 
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
 
 args = parser.parse_args()
+
+# ensure there is no fusion method if it is only to be trained on single modality
+if args.modality != '2-stream':
+    assert(args.fusion == 'none')
+
 print(args)
 
 # Allocate device (gpu/cpu) to be used in training and testing
+# CRITICAL SETTINGS OF DEFAULT GPU HOLDING ALL THE TENSORS
 device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
 num_devices = torch.cuda.device_count() 
 num_workers = num_devices if args.worker_num == -1 else args.worker_num
 
 if args.verbose2:
-    print(f'Device being used: {device} | device_num {num_devices} | parallelism {args.parallel}')
+    print('###### Device being used:', device, '| device_num', num_devices, '| parallelism', args.parallel)
+    print('###### Fusion method:', args.fusion)
 
 # intialize the model hyperparameters
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 
-# Uncomment this to test on whether the Dataloader is working
-########### DATALOADER TESTING ZONE
-#dataset = VideoDataset(args.dataset, args.split, 'train', args.modality, 
-#                       clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt)
-#                                           
-#dataloader = DataLoader(dataset, shuffle=True, batch_size=2, num_workers = num_workers)
-#for x, y in dataloader:
-#    print(x.shape)
-#x,y = next(iter(dataset))
-#print(x.shape)
-###########
-
 save_content = {}
 
 # prepare for training/testing on split selected
-modalities = [args.modality] if args.modality != '2-stream' else ['rgb', 'flow']
+if args.modality != '2-stream':
+    modalities = [args.modality]
+    network = R2Plus1DNet
+    datasetClass = VideoDataset
+else:
+    if args.fusion != 'none':
+        modalities = ['2-stream']
+        network = FusionNet
+        datasetClass = TwoStreamDataset
+    else:
+        modalities = ['rgb', 'flow']
+        network = R2Plus1DNet
+        datasetClass = VideoDataset
+
 splits = [args.split] if args.split != 0 else list(range(1, 4))
 
 # prepare pretrained model
@@ -100,17 +110,23 @@ try:
         
         if args.verbose2:
             #print(f'****** Current task: dataset {args.dataset} | modality {modality} | split {split}')
-            print('****** Current task: dataset ',args.dataset,' | modality ',modality,' | split ',split)
+            print('****** Current task: dataset', args.dataset,'| modality', modality,'| split', split)
         
         # initialize the model
-        model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
-                            in_channels = in_channels[modality], verbose = args.verbose1, 
-                            bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
+        if network == R2Plus1DNet:
+            model = network(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
+                                in_channels = in_channels[modality], verbose = args.verbose1, 
+                                bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
+        else:
+            model = network(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
+                                verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
+        
         # initialize the model parameters according to msra_fill initialization
         # DISABLED as it worsens the optimization
         #msra_init(model)
         
         # introduces parallelism into the model
+        # ASSUME the remote machine has 4 GPUs
         if args.parallel and num_devices > 1 and ('cuda' in device.type):
             """
             nn.DataParallel(module, device_ids, output_device, dim)
@@ -120,7 +136,7 @@ try:
             output_device : default set to device_ids[0]
             dim : deafult = 0, axis where tensors to be scattered
             """
-            model = nn.DataParallel(model)
+            model = nn.DataParallel(model, ['cuda:0', 'cuda:1', 'cuda:3'], 'cuda:2')
         
         # move model to computing devices
         model.to(device)
@@ -141,11 +157,20 @@ try:
             scheduler = optim.lr_scheduler.StepLR(optimizer, step_size = args.step_size, gamma = args.lr_decay)
             
             # prepare the training datasets and validation datasets (if have)
-            train_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'train', modality, 
+            if datasetClass == VideoDataset:
+                train_dataloader = DataLoader(datasetClass(args.dataset_path, args.dataset, split, 'train', modality, 
+                                                           clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
+                                              batch_size = args.batch_size, shuffle = True, num_workers = num_workers)
+                
+                val_dataloader = DataLoader(datasetClass(args.dataset_path, args.dataset, split, 'test', modality, 
+                                                         clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
+                                            batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
+            else:
+                train_dataloader = DataLoader(TwoStreamDataset(args.dataset_path, args.dataset, split, 'train', 
                                                        clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                                           batch_size = args.batch_size, shuffle = True, num_workers = num_workers)
-            
-            val_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'test', modality, 
+                
+                val_dataloader = DataLoader(TwoStreamDataset(args.dataset_path, args.dataset, split, 'test', 
                                                      clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                                         batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
             
@@ -201,11 +226,17 @@ try:
             top_acc = [args.top_acc] if not args.run_all_test else [1, 5]
             
             # initialize testing dataset for clip/video level predictions
-            test_dataloader = DataLoader(VideoDataset(args.dataset_path, args.dataset, split, 'test', modality, 
-                                                         clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt,
-                                                         load_mode = 'video', clips_per_video = args.clips_per_video), 
-                                            batch_size = args.test_batch_size, num_workers = num_workers, shuffle = False)
-            
+            if datasetClass == VideoDataset:
+                test_dataloader = DataLoader(datasetClass(args.dataset_path, args.dataset, split, 'test', modality, 
+                                                             clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt,
+                                                             load_mode = 'video', clips_per_video = args.clips_per_video), 
+                                                batch_size = args.test_batch_size, num_workers = num_workers, shuffle = False)
+            else:
+                test_dataloader = DataLoader(datasetClass(args.dataset_path, args.dataset, split, 'test', 
+                                                             clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt,
+                                                             load_mode = 'video', clips_per_video = args.clips_per_video), 
+                                                batch_size = args.test_batch_size, num_workers = num_workers, shuffle = False)
+    
             for top in top_acc:
                     
                 if args.verbose2:
@@ -238,7 +269,7 @@ except Exception as e:
     print(e)
     
 else:
-    print('Everything went well')
+    print('Everything went well \\\\^o^//')
     
 finally:
     # save the model and details

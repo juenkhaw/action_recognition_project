@@ -4,10 +4,8 @@ Created on Sun Jan 27 12:21:55 2019
 
 @author: Juen
 """
-
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 import numpy as np
 from collections import OrderedDict
@@ -283,7 +281,7 @@ class R2Plus1DNet(nn.Module):
         return x    
 
 if __name__ is '__main__':
-    device = torch.device('gpu')
+    device = torch.device('cuda:0')
     model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2, verbose = True).to(device)
     #module.model_summary(model)
     #module.msra_init(model)

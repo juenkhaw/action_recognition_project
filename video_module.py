@@ -4,7 +4,6 @@ Created on Mon Feb  4 16:13:01 2019
 
 @author: Juen
 """
-
 import numpy as np
 import cv2
 import glob

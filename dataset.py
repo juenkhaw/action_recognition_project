@@ -4,10 +4,7 @@ Created on Mon Feb  4 16:09:32 2019
 
 @author: Juen
 """
-
-import os
 import numpy as np
-import random
 import cv2
 
 from torch.utils.data import Dataset, DataLoader
