@@ -55,7 +55,7 @@ parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k
 parser.add_argument('-nclip', '--clips-per-video', help = 'number of clips for testing video in video-level prediction', default = 10, type = int)
 # output settings
 parser.add_argument('-save', '--save', help = 'save model and accuracy', action = 'store_true', default = False)
-parser.add_argument('-savename', '--savename', help = 'name of the output file', default 'save', type = str)
+parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
 
@@ -80,7 +80,8 @@ if args.verbose2:
 # intialize the model hyperparameters
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
-in_channels = {'rgb' : 3, 'flow' : 2}
+#in_channels = {'rgb' : 3, 'flow' : 2}
+in_channels = {'rgb' : 3, 'flow' : 1}
 
 save_content = {}
 

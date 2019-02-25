@@ -4,6 +4,7 @@ Created on Sat Feb  9 21:50:07 2019
 
 @author: Juen
 """
+from __future__ import print_function
 import time
 
 import torch
@@ -42,6 +43,9 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
             
         for phase in ['train', 'val'] if args.validation_mode else ['train']:
             
+            batch = 0
+            total_batch = len(dataloaders[phase].dataset) // args.batch_size
+            
             # reset the loss and accuracy
             current_loss = 0
             current_correct = 0
@@ -61,6 +65,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                 for inputs, labels in dataloaders[phase]:
                     
                     #print(inputs.shape, labels.shape)
+                    print('Current batch', str(batch), '/', str(total_batch), end = '\r')
+                    batch += 1
                                 
                     # retrieve the inputs and labels and send to respective computing devices
                     inputs = inputs.to(device)
@@ -92,6 +98,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                 for rgbX, flowX, labels in dataloaders['train']:
                 
                     #print(inputs.shape, labels.shape)
+                    print('Current batch', str(batch), '/', str(total_batch), end = '\r')
+                    batch += 1
                                 
                     # retrieve the inputs and labels and send to respective computing devices
                     rgbX = rgbX.to(device)

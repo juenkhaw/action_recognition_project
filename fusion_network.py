@@ -11,15 +11,17 @@ from network_r2p1d import R2Plus1DNet
 
 class FusionNet(nn.Module):
     
+    in_channels = {'rgb': 3, 'flow': 1}
+    
     def __init__(self, layer_sizes, num_classes, device, network = R2Plus1DNet, 
                  bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = False):
         
         super(FusionNet, self).__init__()
         
-        self.rgb_net = network(layer_sizes, num_classes, device, in_channels = 3, 
+        self.rgb_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['rgb'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, 
                                name = 'R2P1D_RGB', verbose = verbose)
-        self.flow_net = network(layer_sizes, num_classes, device, in_channels = 2, 
+        self.flow_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['flow'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, 
                                name = 'R2P1D_FLOW', verbose = verbose)
         

@@ -156,7 +156,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     if modality == 'rgb':
         frame_chn = 3
     else:
-        frame_chn = 2
+        frame_chn = 1 #2
     
     if mode == 'clip':
         t_index = []
@@ -171,7 +171,9 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     
     # create a buffer with size of 
     # video [clip_count, clip_len, height, width, channel]
-    buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
+    #buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
+    buffer = np.empty((clips_per_video, output_len if modality == 'rgb' else output_len * 2,
+                       output_h, output_w, frame_chn), np.float32)
     
     # loading cropped video frames into the numpy array
     for c in range(clips_per_video):
@@ -212,7 +214,8 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
                 if modality == 'rgb':
                     np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
                 else:
-                    np.copyto(buffer[c, count - t_index[c][0], :, :, i], buffer_frame[i][:, :, 0])
+                    #np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
+                    np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
             
             count += 1
     
@@ -232,15 +235,15 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
     
 if __name__ == '__main__':
-    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
-    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
-    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 16, mode = 'video', clips_per_video = 10)
+    #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
+    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
+    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
+    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'video', clips_per_video = 10)
     buffer = buffer.transpose((0, 2, 3, 4, 1))
 #    buffer_chnl = buffer[:, :, :, :, 2]
 #    buffer[:, :, :, :, 2] = buffer[:, :, :, :, 0]
 #    buffer[:, :, :, :, 0] = buffer_chnl
-    cv2.imshow('buffer0', buffer[1, 3, :, :, :])
-    #cv2.imshow('buffer1', buffer[2, 1, 0, :, :])
-    cv2.waitKey(0)
+#    cv2.imshow('buffer0', buffer[6, 0, :, :, :])
+#    cv2.imshow('buffer1', buffer[6, 1, :, :, :])
+#    cv2.waitKey(0)
     cv2.destroyAllWindows()

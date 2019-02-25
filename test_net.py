@@ -4,6 +4,7 @@ Created on Sat Feb 16 15:26:48 2019
 
 @author: Juen
 """
+from __future__ import print_function
 import time
 import numpy as np
 
@@ -35,9 +36,14 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
     test_correct = 0
     test_acc = 0
     
+    batch = 0
+    total_batch = len(test_dataloader.dataset) // args.test_batch_size
+    
     if isinstance(model, R2Plus1DNet):
     
         for inputs, labels in test_dataloader:
+            print('Current batch', str(batch), '/', str(total_batch), end = '\r')
+            batch += 1
             #print(inputs.shape, labels.shape)
             # if loading series of clip, reshaping the inputs tensor to fit into the model
             # from [sample, clips, channel, frame, h, w] to [sample * clips, -1]
@@ -70,6 +76,8 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
     else:
             
         for rgbX, flowX, labels in test_dataloader:
+            print('Current batch', str(batch), '/', str(total_batch), end = '\r')
+            batch += 1
             #print(inputs.shape, labels.shape)
             # if loading series of clip, reshaping the inputs tensor to fit into the model
             # from [sample, clips, channel, frame, h, w] to [sample * clips, -1]
