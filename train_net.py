@@ -127,7 +127,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
             
             if args.verbose2:
                 #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
-                print('Epoch %d | Phase %s | Loss %.4f | Accuracy %.2f' % (epoch + 1, phase, epoch_loss, epoch_acc))
+                print('Epoch %d | Phase %s | Loss %.4f | Accuracy %.4f' % (epoch + 1, phase, epoch_loss, epoch_acc))
     
     # display the time elapsed
     time_elapsed = time.time() - start    

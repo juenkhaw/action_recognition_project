@@ -103,12 +103,12 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             test_correct += np.sum(top_k_indices == np.array(labels))
     
     # compute accuracy over predictions on current batch
-    test_acc = test_correct / len(test_dataloader.dataset)
+    test_acc = float(test_correct) / len(test_dataloader.dataset)
     
     # display the time elapsed in testing
     time_elapsed = time.time() - start
     #print(f"Testing complete in {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
-    print('Testing acc %.2f' % (test_acc))
+    print('\nTesting acc %.4f' % (test_acc))
     print("Testing complete in %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
 
     return predicted, test_acc, time_elapsed
