@@ -248,6 +248,7 @@ try:
                     print('####### Current Testing method: prediction-level ','video',' | top' ,top)
         
                 # use the trained model to predict X_test
+                model.eval()
                 predicted, test_acc, test_elapsed = test_model(
                         args, device, model, test_dataloader, load_mode = 'video', top_acc = top)
                 
