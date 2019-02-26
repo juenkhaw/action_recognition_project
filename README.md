@@ -9,11 +9,11 @@ Please run on `init.py` with one of the arguments provided below:
 
 **Training from scratch (single-modality)**
 
-`ucf [2-stream/rgb/flow] [dataset_path] -cl 8 -ld 18 -parallel -train -test -runalltest -nclip 10 -save -v2`
+`ucf [2-stream/rgb/flow] [dataset_path] -cl 8 -ld 18 -parallel -train -test -runalltest -nclip 10 -save -savename [filename] -v2`
 
 **With pre-trained model (Testing only)**
 
-`ucf 2-stream [dataset_path] -fusion average -cl 8 -ld 18 -parallel -test -runalltest -nclip 10 -save -v2 -loadmodel [model_path]`
+`ucf 2-stream [dataset_path] -fusion average -cl 8 -ld 18 -parallel -test -loadmodel [model_path] -runalltest -nclip 10 -save -v2`
 
 **Test run on gpu**
 
@@ -103,6 +103,7 @@ If parallelism implementation is causing problems, please run it without `-paral
 
 **Output**
 - `-save` save model and accuracy' | default = False
+- `-savename` name of the output file | default = 'save'
 - `-v1` activate to allow reporting of activation shape after each forward propagation | default = False
 - `-v2` activate to allow printing of loss and accuracy after each epoch | default = False
 
