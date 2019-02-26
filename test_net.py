@@ -67,7 +67,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             averaged_score = np.average(np.array(np.split(outputs, current_batch_size)), axis = 1)
             
             # retrieve the label index with the top-N scores
-            top_k_indices = np.argsort(averaged_score, axis = 1)[:, -top_acc:][:, ::-1]
+            top_k_indices = np.argsort(averaged_score, axis = 1)[:, ::-1][:, :top_acc]
             predicted.extend(top_k_indices)
             
             # compute number of matches between predicted labels and true labels
@@ -104,7 +104,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             averaged_score = np.average(np.array(np.split(outputs, current_batch_size)), axis = 1)
             
             # retrieve the label index with the top-N scores
-            top_k_indices = np.argsort(averaged_score, axis = 1)[:, -top_acc:][:, ::-1]
+            top_k_indices = np.argsort(averaged_score, axis = 1)[:, ::-1][:, :top_acc]
             predicted.extend(top_k_indices)
             
             # compute number of matches between predicted labels and true labels
