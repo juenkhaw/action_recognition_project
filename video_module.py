@@ -149,6 +149,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     for i in range(len(frames_path)):
         #path_content.append(os.listdir(frames_path[i]))
         path_content.append(glob.glob(frames_path[i] + '/*.jpg'))
+        path_content[i].sort()
     #sample_frame = cv2.imread(frames_path + '/' + path_content[1], cv2.IMREAD_GRAYSCALE)
     
     # retrieve frame properties
@@ -196,26 +197,31 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
                 #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
                 buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
                 buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
-                
+            
             for i in range(len(buffer_frame)):
                 
-                # resize the frame
-                buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
+                if buffer_frame[i] is not None:
                 
-                # add channel dimension if frame is flow
-                if modality == 'flow':
-                    buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
+                    # resize the frame
+                    buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
                     
-                # apply the random cropping
-                buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
-                             s_index[1][0] : s_index[1][1], :]
-            
-                # copy to the video buffer
-                if modality == 'rgb':
-                    np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
+                    # add channel dimension if frame is flow
+                    if modality == 'flow':
+                        buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
+                        
+                    # apply the random cropping
+                    buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
+                                 s_index[1][0] : s_index[1][1], :]
+                
+                    # copy to the video buffer
+                    if modality == 'rgb':
+                        np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
+                    else:
+                        #np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
+                        np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                        
                 else:
-                    #np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
-                    np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                    print(path_content[i][count])
             
             count += 1
     

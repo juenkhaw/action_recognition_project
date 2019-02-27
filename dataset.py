@@ -156,10 +156,12 @@ if __name__ == '__main__':
 #        pass
 #        print(x1.shape, x2.shape, y)
     
-#    train1 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'train', 'rgb', test_mode = True, 
-#                        test_amt = 8, load_mode = 'clip')
-#    train2 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'train', 'flow', test_mode = True, 
-#                        test_amt = 8, load_mode = 'clip')
+    train1 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
+                        load_mode = 'video', clips_per_video = 10)
+    train2 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'flow', test_mode = False, 
+                        load_mode = 'video', clips_per_video = 8)
+    
+    train2.__getitem__(208)
 #    trainloader1 = DataLoader(train1, batch_size = 2, shuffle = True)
 #    trainloader2 = DataLoader(train2, batch_size = 2, shuffle = True)
 #
