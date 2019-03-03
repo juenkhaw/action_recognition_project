@@ -34,7 +34,7 @@ if __name__ is '__main__':
     device = torch.device('cuda:0')
     model = FusionNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device).to(device)
     
-    x1 = torch.randn((1, 3, 8, 112, 112)).to(device)
-    x2 = torch.randn((1, 2, 8, 112, 112)).to(device)
-    
-    s = model(x1, x2)
+#    x1 = torch.randn((1, 3, 8, 112, 112)).to(device)
+#    x2 = torch.randn((1, 2, 8, 112, 112)).to(device)
+#    
+#    s = model(x1, x2)

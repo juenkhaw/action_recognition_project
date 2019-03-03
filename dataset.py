@@ -157,11 +157,29 @@ if __name__ == '__main__':
 #        print(x1.shape, x2.shape, y)
     
     train1 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
-                        load_mode = 'video', clips_per_video = 10)
+                        load_mode = 'video', clips_per_video = 10, clip_len = 16)
     train2 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'flow', test_mode = False, 
-                        load_mode = 'video', clips_per_video = 8)
+                        load_mode = 'video', clips_per_video = 8, clip_len = 16)
     
-    train2.__getitem__(208)
+    buffer, _ = train1.__getitem__(1500)
+    buffer = buffer.transpose((0, 2, 3, 4, 1))
+    
+    import glob
+    from video_module import denormalize_buffer
+    #dirs = glob.glob('../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BandMarching_g05_c01/*jpg')
+    #dirs = glob.glob('../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BandMarching_g05_c01/*jpg')
+    
+    for i in range(buffer.shape[1]):
+        frame = buffer[0, i, :, :, :]
+        frame = denormalize_buffer(frame)
+        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = cv2.resize(frame, (frame.shape[0] * 4, frame.shape[1] * 4))
+        cv2.imshow('buffer', frame)
+        #cv2.imshow('buffer', buffer[0, i, :, :, :])
+        cv2.waitKey(0)
+        
+    cv2.destroyAllWindows()
+    
 #    trainloader1 = DataLoader(train1, batch_size = 2, shuffle = True)
 #    trainloader2 = DataLoader(train2, batch_size = 2, shuffle = True)
 #

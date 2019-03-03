@@ -197,20 +197,27 @@ class R2Plus1DNet(nn.Module):
     """
     
     VALID_ENDPOINTS = (
-        'Conv3d_1_3x7x7',
+        'Conv3d_1',
         'Conv3d_2_x',
         'Conv3d_3_x',
         'Conv3d_4_x',
-        'Conv3d_5_x'
+        'Conv3d_5_x',
+        'FC',
+        'SOFTMAX'
     )
     
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
-                 in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True):
+                 in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True, 
+                 endpoint = 'FC'):
             
         super(R2Plus1DNet, self).__init__()
         
         self._num_classes = num_classes
         self._verbose = verbose
+        if endpoint in self.VALID_ENDPOINTS:
+            self._endpoint = endpoint
+        else:
+            self._endpoint = 'FC'
         
         self.net = nn.Sequential(OrderedDict([
                 ('conv1',
@@ -241,6 +248,8 @@ class R2Plus1DNet(nn.Module):
         #self.linear = nn.Linear(512, num_classes)
         self.linear1 = nn.Linear(512, num_classes)
         
+        self.softmax = nn.Softmax(dim = 1)
+        
 
     def replaceLinear(self, num_classes):
         """
@@ -266,7 +275,9 @@ class R2Plus1DNet(nn.Module):
             x = self.net[i](x)
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
-                
+            if self._endpoint == self.VALID_ENDPOINTS[i]:
+                return x
+        
         # pre-fc
         x = self.avgpool(x)
         x = x.view(-1, 512)
@@ -278,11 +289,18 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Post FC', x.shape)
         
-        return x    
+        if self._endpoint == 'SOFTMAX':
+            return self.softmax(x)
+        else:
+            return x
 
 if __name__ is '__main__':
-    device = torch.device('cuda:0')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 2, verbose = True).to(device)
+    device = torch.device('cpu')
+    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True).to(device)
+    
+    from torchsummary import summary
+    summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
+    
     #module.model_summary(model)
     #module.msra_init(model)
 

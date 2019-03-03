@@ -114,6 +114,14 @@ def normalize_buffer(buffer):
     buffer = (buffer - 128) / 128
     return buffer
 
+def denormalize_buffer(buffer):
+    
+    buffer = buffer * 128 + 128
+    
+    buffer = buffer.astype(np.uint8)
+    
+    return buffer
+
 def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, output_len, 
                mode = 'clip', clips_per_video = 1):
     """
@@ -186,7 +194,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
             if frame_chn == 3:
                 #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
-                buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_COLOR))
+                buffer_frame.append(cv2.imread(path_content[0][count]))
                 buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
                 
             else:
