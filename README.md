@@ -112,3 +112,4 @@ If parallelism implementation is causing problems, please run it without `-paral
 - A Closer Look at Spatiotemporal Convolutions for Action Recognition https://arxiv.org/abs/1711.11248
 - https://github.com/facebookresearch/VMZ
 - https://github.com/irhumshafkat/R2Plus1D-PyTorch
+- modelsummary https://github.com/jacobkimmel/pytorch_modelsummary
