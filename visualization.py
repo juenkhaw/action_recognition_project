@@ -7,7 +7,6 @@ Created on Sat Mar  2 14:40:47 2019
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
-import cv2
 
 from network_r2p1d import R2Plus1DNet
 from video_module import load_clips
@@ -69,11 +68,12 @@ top_index = activation_sum.argsort(dim = 0, descending = True)[:top_k]
 # convert feature maps back to 5d tensor
 feature_map = torch.unsqueeze(feature_map, 0)
 
-from deconvnet import DeConvNet
+from deconvnet import SpatioTemporalDeconv
 from collections import OrderedDict
 
 # initialize the back prop deconvnet network
-de_model = DeConvNet().to(device)
+de_model = SpatioTemporalDeconv(64, 3, (3, 7, 7), stride = (1, 2, 2), 
+                                 inter_planes = 45, temporal_relu = True).to(device)
 #feature_map = feature_map.to(device)
 
 # extract keys for pretrained conv layer params
