@@ -116,9 +116,7 @@ def normalize_buffer(buffer):
 
 def denormalize_buffer(buffer):
     
-    buffer = buffer * 128 + 128
-    
-    buffer = buffer.astype(np.uint8)
+    buffer = ((buffer - buffer.min()) / (buffer.max() - buffer.min()) * 255).astype(np.uint8)
     
     return buffer
 

@@ -23,7 +23,7 @@ class SpatioTemporalConv(nn.Module):
         stride : (t, h, w) striding over the input volume
         bn_mom : BN momentum hyperparameter
         bn_eps : BN epsilon hyperparameter
-        mi : channels of the intermediate convolution (computes with formula if set to None)
+        inter_planes : channels of the intermediate convolution (computes with formula if set to None)
         bn_relu_first_conv : applies BN and activation on spatial conv or not
         bn_relu_second_conv : applies BN and activation on temporal conv or not
         padding : [SAME/VALID] padding technique to be applied
@@ -32,7 +32,7 @@ class SpatioTemporalConv(nn.Module):
     """
     
     def __init__(self, in_planes, out_planes, kernel_size, stride = (1, 1, 1), 
-                 bn_mom = 0.1, bn_eps = 1e-3, mi = None, 
+                 bn_mom = 0.1, bn_eps = 1e-3, inter_planes = None, 
                  bn_relu_first_conv = True, bn_relu_second_conv = False, 
                  padding = 'SAME', use_bias = False, name = 'SpatioTemporalConv'):
         
@@ -48,11 +48,9 @@ class SpatioTemporalConv(nn.Module):
         temporal_p = [padding[0], 0, 0]
         
         # compute the intermediate planes between spatial and temporal conv if not explicitly provided
-        if mi is None:
+        if inter_planes is None:
             inter_planes = int((kernel_size[0] * in_planes * out_planes * kernel_size[1] * kernel_size[2]) / 
                                (in_planes * kernel_size[1] * kernel_size[2] + kernel_size[0] * out_planes))
-        else:
-            inter_planes = mi
         
         # perform 2D Conv --> BN --> ReLU --> 1D Conv
         self.spatial_conv = module.Conv3D(in_planes, inter_planes, kernel_size = spatial_f, 
@@ -222,7 +220,7 @@ class R2Plus1DNet(nn.Module):
         self.net = nn.Sequential(OrderedDict([
                 ('conv1',
                 SpatioTemporalConv(in_channels, 64, kernel_size = (3, 7, 7), 
-                       stride = (1, 2, 2), padding = 'SAME', mi = 45, name = 'conv1', 
+                       stride = (1, 2, 2), padding = 'SAME', inter_planes = 45, name = 'conv1', 
                        bn_mom = bn_momentum, bn_eps = bn_epson, bn_relu_second_conv = True).to(device)),
                 ('conv2_x', 
                 SpatioTemporalResModule(64, 64, kernel_size = (3, 3, 3), 

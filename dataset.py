@@ -172,7 +172,8 @@ if __name__ == '__main__':
     for i in range(buffer.shape[1]):
         frame = buffer[0, i, :, :, :]
         frame = denormalize_buffer(frame)
-        #frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # MUST TO CONVERT IF USING IMREAD OF CV2
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = cv2.resize(frame, (frame.shape[0] * 4, frame.shape[1] * 4))
         cv2.imshow('buffer', frame)
         #cv2.imshow('buffer', buffer[0, i, :, :, :])

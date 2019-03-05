@@ -12,6 +12,33 @@ import torch.nn.init as init
 
 from collections import OrderedDict
 
+def compute_pad(dim_size, kernel_size, stride):
+    """
+    Dynamically computes padding for each dimension of the input volume
+    
+    Inputs:
+        dim_size : dimension (w, h, t) of the input volume
+        kernel_size : dimension (w, h, t) of kernel
+        stride : stride applied for each dimension
+        
+    Returns:
+        list of 6 ints with padding on both side of all dimensions
+    """
+    pads = []
+    for i in range(len(dim_size) - 1, -1, -1):
+        
+        #padding for each dimension of the input
+        if dim_size[i] % stride[i] == 0:
+            pad = max(kernel_size[i] - stride[i], 0)
+        else:
+            pad = max(kernel_size[i] - (dim_size[i] % stride[i]), 0)
+            
+        #padding for each side for each dimension
+        pads.append(pad // 2)
+        pads.append(pad - pad // 2)
+    
+    return pads
+
 class Conv3D(nn.Module):
     """
     Module consisting of 3D convolution, 3D BN and ReLU in combination
@@ -56,41 +83,10 @@ class Conv3D(nn.Module):
         if activation:
             self.conv.add_module(name + 'relu', nn.ReLU())
         
-    def compute_pad(self, dim, s):
-        """
-        Dynamically computes padding for each dimension of the input volume
-        
-        Inputs:
-            dim : dimension of the input volume
-            s : size (h/w/depth) of that particular dimension
-            
-        Returns:
-            padding of that particular dimension
-        """
-        
-        if s % self._stride[dim] == 0:
-            return max(self._kernel_size[dim] - self._stride[dim], 0)
-        else:
-            return max(self._kernel_size[dim] - (s % self._stride[dim]), 0)
-        
     def forward(self, x):
         
         if self._padding == 'SAME':
-            
-            #retrieve temporal and spatial dimension of the input
-            t, h, w = x.size()[2:]
-            
-            #padding for each dimension of the input
-            pad_t = self.compute_pad(0, t)
-            pad_h = self.compute_pad(1, h)
-            pad_w = self.compute_pad(2, w)
-            
-            #padding for each side for each dimension
-            pad = (pad_w // 2, pad_w - pad_w // 2,
-                   pad_h // 2, pad_h - pad_h // 2,
-                   pad_t // 2, pad_t - pad_t // 2)
-            
-            x = F.pad(x, pad)
+            x = F.pad(x, compute_pad(x.shape[2:], self._kernel_size, self._stride))
             
         return self.conv(x)
 
@@ -99,39 +95,9 @@ class MaxPool3DSame(nn.MaxPool3d):
     Module of SAME max 3D pooling with dynamic padding
     """
         
-    def compute_pad(self, dim, s):
-        """
-        Dynamically computes padding for each dimension of the input volume
-        
-        Inputs:
-            dim : dimension of the input volume
-            s : size (h/w/depth) of that particular dimension
-            
-        Returns:
-            padding of that particular dimension
-        """
-        
-        if s % self.stride[dim] == 0:
-            return max(self.kernel_size[dim] - self.stride[dim], 0)
-        else:
-            return max(self.kernel_size[dim] - (s % self.stride[dim]), 0)
-        
     def forward(self, x):
-            
-        #retrieve temporal and spatial dimension of the input
-        t, h, w = x.size()[2:]
-            
-        #padding for each dimension of the input
-        pad_t = self.compute_pad(0, t)
-        pad_h = self.compute_pad(1, h)
-        pad_w = self.compute_pad(2, w)
-            
-        #padding for each side for each dimension
-        pad = (pad_w // 2, pad_w - pad_w // 2,
-             pad_h // 2, pad_h - pad_h // 2,
-             pad_t // 2, pad_t - pad_t // 2)
-          
-        x = F.pad(x, pad)
+        
+        x = F.pad(x, compute_pad(x.shape[2:], self.kernel_size, self.stride))
             
         return super(MaxPool3DSame, self).forward(x)
     
@@ -188,7 +154,7 @@ def getModuleCount(net):
     
 if __name__ is '__main__':
     
-    conv3D_test = Conv3D(109, 56, (3, 3, 3), stride=(2, 2, 2), padding = 'VALID')
+    conv3D_test = Conv3D(109, 56, (3, 3, 3), stride=(2, 2, 2), padding = 'SAME')
     mp3D_test = MaxPool3DSame(kernel_size=(1,3,3), stride=(1,2,2))
     
     x = torch.randn((1, 64, 32, 112, 112))
