@@ -73,10 +73,28 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     labels = labels.long().to(device)
                     optimizer.zero_grad()
                     
+                    # partioning each batch into subbatches to fit into memory
+                    #data = zip(inputs, labels)
+                    subbatches = []
+                    part_num = inputs.shape[0] // args.subbatch_size
+                    if args.subbatch_size < inputs.shape[0]:
+                        subbatches = [inputs[i * args.subbatch_size : i * args.subbatch_size 
+                                             + args.subbatch_size] for i in range(part_num)]
+                        if part_num * args.subbatch_size < inputs.shape[0]:
+                            subbatches.append(inputs[part_num * args.subbatch_size : ])
+                    else:
+                        subbatches.append(inputs)
+                                        
                     # with enabling gradient descent on parameters during training phase
                     with torch.set_grad_enabled(phase == 'train'):
                         # compute the final scores
-                        outputs = model(inputs)
+                        outputs = torch.tensor([], dtype = torch.float).to(device)
+                        for sb in range(len(subbatches)):
+                            print(subbatches[sb].shape)
+                            output = model(subbatches[sb])
+                            outputs = torch.cat((outputs, output))
+                            #print(outputs.shape)
+                            
                         # transforming outcome from a series of scores to a single scalar index
                         # indicating the index where the highest score held
                         _, preds = torch.max(outputs, 1)
@@ -87,6 +105,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                         if phase == 'train':
                             loss.backward()
                             optimizer.step()
+                            if scheduler is not None:
+                                scheduler.step()
                         
                         # accumulate loss and true positive for the current batch
                         current_loss += loss.item() * inputs.size(0)
@@ -121,6 +141,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                         if phase == 'train':
                             loss.backward()
                             optimizer.step()
+                            if scheduler is not None:
+                                scheduler.step()
                         
                         # accumulate loss and true positive for the current batch
                         current_loss += loss.item() * rgbX.size(0)
