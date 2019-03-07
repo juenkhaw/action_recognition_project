@@ -143,7 +143,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     with torch.set_grad_enabled(phase == 'train'):
                         outputs = torch.tensor([], dtype = torch.float).to(device)
                         for sb in range(len(sub_rgbX)):
-                            print(sub_rgbX[sb].shape)
+                            #print(sub_rgbX[sb].shape)
                             # compute the final scores
                             outputs = model(sub_rgbX[sb], sub_flowX[sb])
                             

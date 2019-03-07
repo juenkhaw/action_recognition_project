@@ -8,7 +8,10 @@ from __future__ import print_function
 import time
 import numpy as np
 
+import torch
+
 from network_r2p1d import R2Plus1DNet
+from train_net import generate_subbatches
 
 def test_model(args, device, model, test_dataloader, load_mode, top_acc):
     """
@@ -58,10 +61,18 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             # reshaping labels tensor
             labels = np.array(labels).reshape(len(labels), 1)
             
-            # use model to predict scores
-            # copy the tensor to host memory before converting to np array
-            outputs = model(inputs).cpu().detach().numpy()
-            #outputs = np.random.randn(current_batch_size * clips_size, 101)
+            # partioning each batch into subbatches to fit into memory
+            sub_inputs = generate_subbatches(args.sub_test_batch_size, inputs)[0]
+            
+            with torch.set_grad_enabled(False):
+                outputs = torch.tensor([], dtype = torch.float).to(device)
+                for sb in range(len(sub_inputs)):
+                    #print(sub_inputs[sb].shape)
+                    # use model to predict scores
+                    output = model(sub_inputs[sb])
+                    outputs = torch.cat((outputs, output))
+                
+            outputs = outputs.cpu().detach().numpy()
             
             # average the scores for each classes across all clips that belong to the same video
             averaged_score = np.average(np.array(np.split(outputs, current_batch_size)), axis = 1)
@@ -95,10 +106,19 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             # reshaping labels tensor
             labels = np.array(labels).reshape(len(labels), 1)
             
-            # use model to predict scores
-            # copy the tensor to host memory before converting to np array
-            outputs = model(rgbX, flowX).cpu().detach().numpy()
-            #outputs = np.random.randn(current_batch_size * clips_size, 101)
+            # partioning each batch into subbatches to fit into memory
+            sub_rgbX, sub_flowX = generate_subbatches(args.sub_test_batch_size, rgbX, flowX)
+            
+            with torch.set_grad_enabled(False):
+                outputs = torch.tensor([], dtype = torch.float).to(device)
+                for sb in range(len(sub_rgbX)):
+                    #print(sub_rgbX[sb].shape, sub_flowX[sb].shape)
+                    # use model to predict scores
+                    # copy the tensor to host memory before converting to np array
+                    output = model(sub_rgbX[sb], sub_flowX[sb])
+                    outputs = torch.cat((outputs, output))
+                
+            outputs = outputs.cpu().detach().numpy()
             
             # average the scores for each classes across all clips that belong to the same video
             averaged_score = np.average(np.array(np.split(outputs, current_batch_size)), axis = 1)
