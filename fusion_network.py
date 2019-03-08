@@ -68,7 +68,7 @@ class FusionNet(nn.Module):
             # softmax to make sure total of all weights = 1
             weights = self.mfs_softmax(out)
             
-            print(weights)
+            #print(weights)
             
             # return scores with learned weights
             return s1 * weights[0] + s2 * weights[1]
