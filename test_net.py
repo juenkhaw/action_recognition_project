@@ -62,7 +62,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
             labels = np.array(labels).reshape(len(labels), 1)
             
             # partioning each batch into subbatches to fit into memory
-            sub_inputs = generate_subbatches(args.sub_test_batch_size, inputs)[0]
+            sub_inputs = generate_subbatches(args.sub_test_batch_size, inputs)
             
             with torch.set_grad_enabled(False):
                 outputs = torch.tensor([], dtype = torch.float).to(device)
@@ -70,6 +70,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
                     #print(sub_inputs[sb].shape)
                     # use model to predict scores
                     # copy the tensor to host memory before converting to np array
+                    #print(sub_inputs[sb].shape)
                     output = model(sub_inputs[sb])
                     outputs = torch.cat((outputs, output))
                 

@@ -13,6 +13,10 @@ from network_r2p1d import R2Plus1DNet
 
 def generate_subbatches(sbs, *tensors):
     
+    #print(tensors.__class__)
+    if isinstance(tensors, torch.Tensor):
+        tensors = [tensors]
+        
     subbatches = []
     for i in range(len(tensors)):
         subbatch = []
@@ -21,11 +25,11 @@ def generate_subbatches(sbs, *tensors):
             subbatch = [tensors[i][j * sbs : j * sbs + sbs] for j in range(part_num)]
             if part_num * sbs < tensors[i].shape[0]:
                 subbatch.append(tensors[i][part_num * sbs : ])
+            subbatches.append(subbatch)
         else:
-            subbatches.append(tensors[i])
-        subbatches.append(subbatch)
-        
-    return subbatches
+            subbatches.append([tensors[i]])
+    
+    return subbatches if len(tensors) > 1 else subbatches[0]
 
 def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
     """
@@ -99,6 +103,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                         for sb in range(len(sub_inputs)):
                             #print(sub_inputs[sb].shape)
                             # compute the final scores
+                            #print(sub_inputs[sb].shape)
                             outputs = model(sub_inputs[sb])
                             
                             # transforming outcome from a series of scores to a single scalar index
