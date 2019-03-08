@@ -85,6 +85,7 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 #in_channels = {'rgb' : 3, 'flow' : 2}
 in_channels = {'rgb' : 3, 'flow' : 1}
+fusion_endpoint = {'average' : 'FC', 'modality-wf' : 'AP'}
 
 save_content = {}
 
@@ -124,6 +125,7 @@ try:
                                 bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
         else:
             model = network(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
+                                fusion = args.fusion, endpoint = fusion_endpoint[args.fusion], 
                                 verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
         
         # initialize the model parameters according to msra_fill initialization

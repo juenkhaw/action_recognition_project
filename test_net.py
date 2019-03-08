@@ -69,6 +69,7 @@ def test_model(args, device, model, test_dataloader, load_mode, top_acc):
                 for sb in range(len(sub_inputs)):
                     #print(sub_inputs[sb].shape)
                     # use model to predict scores
+                    # copy the tensor to host memory before converting to np array
                     output = model(sub_inputs[sb])
                     outputs = torch.cat((outputs, output))
                 

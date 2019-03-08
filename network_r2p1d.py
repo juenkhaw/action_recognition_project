@@ -200,6 +200,7 @@ class R2Plus1DNet(nn.Module):
         'Conv3d_3_x',
         'Conv3d_4_x',
         'Conv3d_5_x',
+        'AP',
         'FC',
         'SOFTMAX'
     )
@@ -281,6 +282,9 @@ class R2Plus1DNet(nn.Module):
         x = x.view(-1, 512)
         if self._verbose:
             print('Pre FC', x.shape)
+            
+        if self._endpoint == 'AP':
+            return x
         
         # fc linear layer
         x = self.linear1(x)

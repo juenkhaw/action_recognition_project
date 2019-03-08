@@ -118,8 +118,9 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                         # update parameters if it is training phase
                         if phase == 'train':
                             optimizer.step()
-                            if scheduler is not None:
-                                scheduler.step()
+                            
+                if scheduler is not None:
+                    scheduler.step()
                         
             else:
                 
@@ -163,8 +164,9 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                         # update parameters if it is training phase
                         if phase == 'train':
                             optimizer.step()
-                            if scheduler is not None:
-                                scheduler.step()
+                            
+                if scheduler is not None:
+                    scheduler.step()
                 
             # compute the loss and accuracy for the current batch
             epoch_loss = current_loss / len(dataloaders[phase].dataset)
