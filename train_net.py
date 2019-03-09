@@ -11,6 +11,26 @@ import torch
 
 from network_r2p1d import R2Plus1DNet
 
+def generate_subbatches(sbs, *tensors):
+    
+    #print(tensors.__class__)
+    if isinstance(tensors, torch.Tensor):
+        tensors = [tensors]
+        
+    subbatches = []
+    for i in range(len(tensors)):
+        subbatch = []
+        part_num = tensors[i].shape[0] // sbs
+        if sbs < tensors[i].shape[0]:
+            subbatch = [tensors[i][j * sbs : j * sbs + sbs] for j in range(part_num)]
+            if part_num * sbs < tensors[i].shape[0]:
+                subbatch.append(tensors[i][part_num * sbs : ])
+            subbatches.append(subbatch)
+        else:
+            subbatches.append([tensors[i]])
+    
+    return subbatches if len(tensors) > 1 else subbatches[0]
+
 def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
     """
     This function trains (and validates if available) network with appointed training set, optmizer, criterion
@@ -52,7 +72,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
             
             # initialize the model with respective mode
             if phase == 'train':
-                scheduler.step()
+                if scheduler is not None:
+                    scheduler.step()
                 model.train()
             else:
                 model.eval()
@@ -73,24 +94,36 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     labels = labels.long().to(device)
                     optimizer.zero_grad()
                     
+                    # partioning each batch into subbatches to fit into memory
+                    sub_inputs, sub_labels = generate_subbatches(args.subbatch_size, inputs, labels)
+                    
+                                        
                     # with enabling gradient descent on parameters during training phase
                     with torch.set_grad_enabled(phase == 'train'):
-                        # compute the final scores
-                        outputs = model(inputs)
-                        # transforming outcome from a series of scores to a single scalar index
-                        # indicating the index where the highest score held
-                        _, preds = torch.max(outputs, 1)
-                        # compute the loss
-                        loss = criterion(outputs, labels)
+                        outputs = torch.tensor([], dtype = torch.float).to(device)
+                        for sb in range(len(sub_inputs)):
+                            #print(sub_inputs[sb].shape)
+                            # compute the final scores
+                            #print(sub_inputs[sb].shape)
+                            outputs = model(sub_inputs[sb])
+                            
+                            # transforming outcome from a series of scores to a single scalar index
+                            # indicating the index where the highest score held
+                            _, preds = torch.max(outputs, 1)
+                            
+                            # compute the loss
+                            loss = criterion(outputs, sub_labels[sb])
+                            
+                            loss.backward()
+                            
+                            # accumulate loss and true positive for the current subbatch
+                            current_loss += loss.item() * sub_inputs[sb].size(0)
+                            current_correct += torch.sum(preds == sub_labels[sb].data)
+                        
                         
                         # update parameters if it is training phase
                         if phase == 'train':
-                            loss.backward()
                             optimizer.step()
-                        
-                        # accumulate loss and true positive for the current batch
-                        current_loss += loss.item() * inputs.size(0)
-                        current_correct += torch.sum(preds == labels.data)
                         
             else:
                 
@@ -107,24 +140,33 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     labels = labels.long().to(device)
                     optimizer.zero_grad()
                     
+                    # partioning each batch into subbatches to fit into memory
+                    sub_rgbX, sub_flowX, sub_labels = generate_subbatches(args.subbatch_size, rgbX, flowX, labels)
+                    
                     # with enabling gradient descent on parameters during training phase
                     with torch.set_grad_enabled(phase == 'train'):
-                        # compute the final scores
-                        outputs = model(rgbX, flowX)
-                        # transforming outcome from a series of scores to a single scalar index
-                        # indicating the index where the highest score held
-                        _, preds = torch.max(outputs, 1)
-                        # compute the loss
-                        loss = criterion(outputs, labels)
+                        outputs = torch.tensor([], dtype = torch.float).to(device)
+                        for sb in range(len(sub_rgbX)):
+                            #print(sub_rgbX[sb].shape)
+                            # compute the final scores
+                            outputs = model(sub_rgbX[sb], sub_flowX[sb])
+                            
+                            # transforming outcome from a series of scores to a single scalar index
+                            # indicating the index where the highest score held
+                            _, preds = torch.max(outputs, 1)
+                            
+                            # compute the loss
+                            loss = criterion(outputs, sub_labels[sb])
+                            
+                            loss.backward()
+                            
+                            # accumulate loss and true positive for the current subbatch
+                            current_loss += loss.item() * sub_rgbX[sb].size(0)
+                            current_correct += torch.sum(preds == sub_labels[sb].data)
                         
                         # update parameters if it is training phase
                         if phase == 'train':
-                            loss.backward()
                             optimizer.step()
-                        
-                        # accumulate loss and true positive for the current batch
-                        current_loss += loss.item() * rgbX.size(0)
-                        current_correct += torch.sum(preds == labels.data)
                 
             # compute the loss and accuracy for the current batch
             epoch_loss = current_loss / len(dataloaders[phase].dataset)

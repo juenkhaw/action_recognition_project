@@ -6,6 +6,7 @@ Created on Mon Feb 11 21:45:34 2019
 """
 import argparse
 import itertools
+import traceback
 
 import torch
 from torch import nn, optim
@@ -27,13 +28,14 @@ parser.add_argument('-sp', '--split', help = 'dataset split selected in training
 parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
+parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
 parser.add_argument('-lr', '--learning-rate', help = 'initial learning rate (alpha) for updating parameters', default = 0.01, type = float)
 parser.add_argument('-ss', '--step-size', help = 'decaying lr for each [ss] epoches', default = 10, type = int)
 parser.add_argument('-gm', '--lr-decay', help = 'lr decaying rate', default = 0.1, type = float)
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
 # fusion settings
-parser.add_argument('-fusion', '--fusion', help = 'Fusion method to be used', default = 'none', choices = ['none', 'average'])
+parser.add_argument('-fusion', '--fusion', help = 'Fusion method to be used', default = 'none', choices = ['none', 'average', 'modality-wf'])
 # debugging mode settings
 parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
 parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
@@ -49,6 +51,7 @@ parser.add_argument('-va', '--validation-mode', help = 'activate validation mode
 # testing settings
 parser.add_argument('-test', '--test', help = 'activate to evaluate the model', action = 'store_true', default = False)
 parser.add_argument('-tbs', '--test-batch-size', help = 'number of sample in each testing batch', default = 1, type = int)
+parser.add_argument('-stbs', '--sub-test-batch-size', help = 'number of clips in each testing sub-batch', default = 8, type = int)
 parser.add_argument('-runalltest', '--run-all-test', help = 'activate to run all prediction methods to obtain multiple accuracy', action = 'store_true', default = False)
 parser.add_argument('-lm', '--load-mode', help = 'load testing samples as series of clips (video) or a single clip', default = 'video', choices = ['video'])
 parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k predicted labels', default = 1, type = int)
@@ -82,6 +85,7 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 #in_channels = {'rgb' : 3, 'flow' : 2}
 in_channels = {'rgb' : 3, 'flow' : 1}
+fusion_endpoint = {'average' : 'FC', 'modality-wf' : 'AP'}
 
 save_content = {}
 
@@ -121,6 +125,7 @@ try:
                                 bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
         else:
             model = network(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
+                                fusion = args.fusion, endpoint = fusion_endpoint[args.fusion], 
                                 verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
         
         # initialize the model parameters according to msra_fill initialization
@@ -268,8 +273,8 @@ try:
             
         save_content[modality]['split' + str(split)].update(testing_content)
                     
-except Exception as e:
-    print(e)
+except Exception:
+    print(traceback.format_exc())
     
 else:
     print('Everything went well \\\\^o^//')
