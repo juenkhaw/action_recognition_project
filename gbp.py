@@ -8,13 +8,21 @@ Created on Sat Mar  2 19:25:34 2019
 import torch
 import torch.nn as nn
 
-import numpy as np
-
 from network_r2p1d import R2Plus1DNet
 
 class GBP(object):
+    """
+    Class containing guided backprop visualization tools
+    
+    Constructor requires:
+        model : network module to be modified to perform guided backprop
+    """
     
     def init_hook_input_space(self):
+        """
+        register a hook function at the conv module that is nearest to input space
+        to retrieve the gradient map flowing to the input layer
+        """
         
         def hook_first_layer(module, grad_input, grad_output):
             # expect output grads has shape of (1, 3, t, h, w)
@@ -27,13 +35,22 @@ class GBP(object):
             self.output_grads = grad_input[0]
             
         first_block = None
+        # finding the first conv module
         for module in self.model.modules():
             if isinstance(module, nn.Conv3d):
                 first_block = module
                 break
+            
+        # assign the hook function onto the first conv module
         first_block.register_backward_hook(hook_first_layer)
         
     def init_hook_relu(self):
+        """
+        register hook functions in all relu modules throughout the network
+        forward prop : to store the output activation map as buffer and to be used in backprop
+        backward prop : to zero out the upstream gradient of dead neurons based on the corresponding 
+                        activation map stored during forward prop
+        """
         
         def hook_relu_forward(module, input, output):
             # store the relu output of current layer
@@ -54,6 +71,7 @@ class GBP(object):
             grad_mask = grad_mask.type_as(grad)
             return (grad_mask * grad, )
         
+        # registering relu hook functions
         for module in self.model.modules():
             if isinstance(module, nn.ReLU):
                 module.register_forward_hook(hook_relu_forward)
@@ -70,11 +88,23 @@ class GBP(object):
         self.init_hook_relu()
         
     def compute_grad(self, input, filter_pos):
+        """
+        Feeds network with testing input volume and retrieves the input space gradient
+        
+        Inputs:
+            input : testing volume of clip
+            filter_pos : selection of a kernel activation map in the top (nearest to output) module
+                
+        Outputs:
+            input sapce gradient map
+        """
         
         self.model.zero_grad()
         
         # expected output has shape of (1, chnl, t, h, w)
         output = self.model(input)
+        
+        # zero out rest of the neurons activation map
         output = torch.sum(torch.abs(output[0, filter_pos]))
         
         # backprop

@@ -4,29 +4,43 @@ Created on Sat Mar  2 14:40:47 2019
 
 @author: Juen
 """
+import argparse
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
 
 from network_r2p1d import R2Plus1DNet
-from video_module import load_clips
+from gbp_video_module import load_clips
 from gbp import GBP
 
-device = torch.device('cuda:0')
-p = torch.load('run3_rgb.pth.tar', map_location = 'cuda:0')
-endpoint = 'Conv3d_1'
-filter_no = 0
+parser = argparse.ArgumentParser(
+        description = 'PyTorch 2.5D Action Recognition ResNet Visualization with Guided Backprop')
+
+parser.add_argument('model_path', help = 'path to pretrained model')
+parser.add_argument('test_video', help = 'video name to be visualized')
+
+parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
+parser.add_argument('-endp', '--endpoint', help = 'module block where forprop to and backprop from', default = 'Conv3d_5_x')
+parser.add_argument('-filter', '--filter-pos', help = 'filter chosen to be visualised', type = int, default = 0)
+parser.add_argument('-nframe', '--frame-num', help = 'frame number for each testing clip', type = int, default = 8)
+parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
+
+args = parser.parse_args()
+
+device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
+p = torch.load(args.model_path, map_location = 'cuda:0')
 
 # read in the testing frames
-frame_path = r'..\dataset\UCF-101\ucf101_jpegs_256\jpegs_256\v_CuttingInKitchen_g05_c05'
-test_frame = load_clips([frame_path], 'rgb', 128, 171, 112, 112, 8, mode = 'video', clips_per_video = 2)
+frame_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/' + args.test_video
+test_frame = load_clips(frame_path, 128, 171, 112, 112, args.frame_num)
 test_frame = torch.tensor(test_frame).requires_grad_().to(device)
 
 # initialize the forward prop network
 # endpoint indicates conv block at which forward prop stops
 model = R2Plus1DNet(
         layer_sizes = [2, 2, 2, 2], num_classes = 101, 
-        device = device, in_channels = 3, verbose = True, endpoint = endpoint).to(device)
+        device = device, in_channels = 3, verbose = args.verbose1,
+        endpoint = args.endpoint).to(device)
 
 # load the pretrained model into memory
 model.load_state_dict(p['content']['rgb']['split1']['state_dict'], strict = False)
@@ -35,7 +49,7 @@ model.load_state_dict(p['content']['rgb']['split1']['state_dict'], strict = Fals
 #model.zero_grad()
 
 gbp = GBP(model)
-x_grads = gbp.compute_grad(test_frame, 0)
+x_grads = gbp.compute_grad(test_frame, args.filter_pos)
 #test_frame.grad.data.zero_()
 
 col = 2
@@ -54,7 +68,7 @@ for i in range(0, test_frame.shape[2] * 2):
     fig.add_subplot(row, col, i + 1)
     plt.axis('off')
     plt.imshow(img)
-plt.subplots_adjust(hspace=0.1, wspace=0.1)
+plt.subplots_adjust(hspace=0, wspace=0)
 plt.show()
 
 #fig = plt.figure(figsize = (col * 4, row * 4))

@@ -7,7 +7,6 @@ Created on Sun Jan 27 12:21:55 2019
 import torch
 import torch.nn as nn
 
-import numpy as np
 from collections import OrderedDict
 
 import module
