@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import VideoDataset, TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
 from fusion_network import FusionNet
-from train_net import train_model
+from train_net import train_model, save_training_model
 from test_net import test_model
 
 parser = argparse.ArgumentParser(description = 'PyTorch 2.5D Action Recognition ResNet')
@@ -58,6 +58,7 @@ parser.add_argument('-topk', '--top-acc', help = 'comapre true labels with top-k
 parser.add_argument('-nclip', '--clips-per-video', help = 'number of clips for testing video in video-level prediction', default = 10, type = int)
 # output settings
 parser.add_argument('-save', '--save', help = 'save model and accuracy', action = 'store_true', default = False)
+parser.add_argument('-saveintv', '--save-interval', help = 'save model after running N epochs', default = 5, type = int)
 parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -108,7 +109,7 @@ splits = [args.split] if args.split != 0 else list(range(1, 4))
 
 # prepare pretrained model
 if args.load_model is not None:
-    content = torch.load(args.load_model)
+    content = torch.load(args.load_model)['content']
 
 try:
 
@@ -151,7 +152,7 @@ try:
         # if pretrained model is available, load it
         if args.load_model is not None:
             print('##### Loading pre-trained model', args.load_model + '/content/' + modality + '/split' + str(split) + '/state_dict')
-            model.load_state_dict(content['content'][modality]['split'+str(split)]['state_dict'],
+            model.load_state_dict(content[modality]['split'+str(split)]['state_dict'],
                     strict = False)
             
         if args.train:
@@ -182,22 +183,7 @@ try:
                                         batch_size = args.batch_size, num_workers = num_workers) if args.validation_mode else None
             
             dataloaders = {'train': train_dataloader, 'val': val_dataloader}
-            
-            # Uncomment this to test on only few randomly selected classes
-            # Note: Training tends to fail when num_classess is too small
-            # Solved by disabling validation mode, possible cause is that no sample for the validation y label
-            ############# MODEL TESTING ZONE
-            #old_y = set(list(train_dataloader.dataset._labels))
-            #num_classes = len(old_y)
-            #y_dict = {old_label : new_label for new_label, old_label in enumerate(old_y)}
-            #train_dataloader.dataset._labels = np.array([y_dict[i] for i in train_dataloader.dataset._labels], dtype = int)
-            ##val_dataloader.dataset._labels = np.array([y_dict[i] for i in val_dataloader.dataset._labels], dtype = int)
-            ##print(train_dataloader.dataset._labels, val_dataloader.dataset._labels)
-            #model.replaceLinear(num_classes)
-            #model.to(device)
-            ##msra_init(model)
-            #############
-            
+
             if args.verbose2:
                 if args.validation_mode:
                     print('###### Dataset loaded:', ' training samples', len(train_dataloader.dataset), '| validation samples', 
@@ -207,21 +193,25 @@ try:
                     print('###### Dataset loaded:', ' training samples', len(train_dataloader.dataset), '| validation samples None')
             
             # train model
-            train_loss, train_acc, train_elapsed = train_model(
-                    args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
-            
-            if modality not in save_content.keys():
-                save_content[modality] = {}
+            if args.save:
+                train_loss, train_acc, train_elapsed = train_model(
+                        args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler, 
+                        pretrained_content = content if args.load_model is not None else None, 
+                        modality = modality, split = split, save_content = save_content)
                 
-            save_content[modality].update({
-                'split' + str(split) : {
-                    'train_acc' : train_acc,
-                    'train_loss' : train_loss,
-                    'train_elapsed' : train_elapsed,
-                    'state_dict' : model.state_dict(),
-                    'opt_dict': optimizer.state_dict()
-                    }
-            })
+                save_training_model(args, save_content, modality, split, 
+                                    train_acc = train_acc,
+                                    train_loss = train_loss,
+                                    train_elapsed = train_elapsed,
+                                    state_dict = model.state_dict(),
+                                    opt_dict = optimizer.state_dict(),
+                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                    epoch = args.epoch
+                                    )
+                
+            else:
+                train_loss, train_acc, train_elapsed = train_model(
+                        args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
             
         testing_content = {}
         
@@ -272,19 +262,18 @@ try:
             save_content[modality]['split' + str(split)] = {}
             
         save_content[modality]['split' + str(split)].update(testing_content)
+        
+        # saving complete contents
+        if args.save:
+            save_path = args.savename + '.pth.tar'
+            print('Saving all content to', save_path)
+            torch.save({
+                    'args' : args,
+                    'content' : save_content
+                    }, save_path)
                     
 except Exception:
     print(traceback.format_exc())
     
 else:
     print('Everything went well \\\\^o^//')
-    
-finally:
-    # save the model and details
-    if args.save:
-        save_path = args.savename + '.pth.tar'
-        print('Saving content to', save_path)
-        torch.save({
-                'args' : args,
-                'content' : save_content
-                }, save_path)

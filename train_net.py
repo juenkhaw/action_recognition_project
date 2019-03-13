@@ -31,7 +31,25 @@ def generate_subbatches(sbs, *tensors):
     
     return subbatches if len(tensors) > 1 else subbatches[0]
 
-def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
+def save_training_model(args, save_content, modality, split, **contents):
+    
+    if modality not in save_content.keys():
+        save_content[modality] = {}
+        
+    save_content[modality].update({
+        'split' + str(split) : contents
+    })
+
+    save_path = args.savename + '.pth.tar'
+    #print('Saving at epoch', epoch + 1)
+    torch.save({
+            'args' : args,
+            'content' : save_content
+            }, save_path)
+    
+
+def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None, 
+                pretrained_content = None, modality = None, split = None, save_content = None):
     """
     This function trains (and validates if available) network with appointed training set, optmizer, criterion
     and scheduler (if available)
@@ -51,10 +69,22 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
         time_elapsed : time taken in training
     """
     
-    train_loss = []
-    train_acc = []
-    start = time.time()
-    epoch = 0
+    # loading those forsaken guys if halfway-pretrained model is identified
+    if pretrained_content is not None:
+        train_loss = pretrained_content[modality]['split'+str(split)]['train_loss']
+        train_acc = pretrained_content[modality]['split'+str(split)]['train_acc']
+        start = time.time() - pretrained_content[modality]['split'+str(split)]['train_elapsed']
+        epoch = pretrained_content[modality]['split'+str(split)]['epoch']
+        # loading model is already done in main function
+        optimizer.load_state_dict(pretrained_content[modality]['split'+str(split)]['opt_dict'])
+        if scheduler is not None:
+            scheduler.load_state_dict(pretrained_content[modality]['split'+str(split)]['sch_dict'])
+    # else initializing them with emptiness
+    else:
+        train_loss = []
+        train_acc = []
+        start = time.time()
+        epoch = 0
     
     if args.verbose2:
         print('Starting to train model.......')
@@ -178,7 +208,20 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
             if args.verbose2:
                 #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
                 print('Epoch %d | Phase %s | Loss %.4f | Accuracy %.4f' % (epoch + 1, phase, epoch_loss, epoch_acc))
-    
+        
+        # time to save these poor guys
+        # dun wanna losing them again
+        if (epoch + 1) % args.save_interval == 0 and args.save:
+            
+            save_training_model(args, save_content, modality, split, 
+                                train_acc = train_acc,
+                                train_loss = train_loss,
+                                train_elapsed = time.time() - start,
+                                state_dict = model.state_dict(),
+                                opt_dict = optimizer.state_dict(),
+                                sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                epoch = epoch + 1)
+            
     # display the time elapsed
     time_elapsed = time.time() - start    
     #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
