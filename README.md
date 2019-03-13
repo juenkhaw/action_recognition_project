@@ -67,12 +67,12 @@ If parallelism implementation is causing problems, please run it without `-paral
 ### Output
 
 The output file should contain contents with structure as following if training and testing are done in one shot:
-
+<pre>
 output.pth.tar
-|-args
-|-content
-  |-modality(s)
-    |-split(s)
+|-args  
+|-content  
+  |-modality (s)  
+    |-split (s)  
       |-train_acc
       |-train_loss
       |-train_elapsed
@@ -80,10 +80,11 @@ output.pth.tar
       |-opt_dict
       |-sch_dict
       |-epoch
-      |-video@N
+      |-video@N (s)
         |-predicted
         |-test_acc
         |-test_elpased
+</pre>
 
 ### Arguments
 
