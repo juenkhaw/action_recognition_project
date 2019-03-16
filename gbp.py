@@ -7,6 +7,7 @@ Created on Sat Mar  2 19:25:34 2019
 
 import torch
 import torch.nn as nn
+import numpy as np
 
 from network_r2p1d import R2Plus1DNet
 
@@ -83,7 +84,6 @@ class GBP(object):
         self.output_grads = None
         self.forward_relu_outputs = []
         
-        self.model.eval()
         self.init_hook_input_space()
         self.init_hook_relu()
         
@@ -99,18 +99,23 @@ class GBP(object):
             input sapce gradient map
         """
         
+        self.model.eval()            
         self.model.zero_grad()
         
         # expected output has shape of (1, chnl, t, h, w)
         output = self.model(input)
         
         # zero out rest of the neurons activation map
-        output = torch.sum(torch.abs(output[0, filter_pos]))
+        activation = torch.sum(torch.abs(output[0, filter_pos]))
         
         # backprop
-        output.backward()
+        activation.backward()
         
         return self.output_grads.cpu().detach().numpy()
+    
+    def compute_abs_saliency(self, gradient):
+        
+        return (np.abs(gradient) / np.max(gradient))
         
         
 if __name__ == '__main__':

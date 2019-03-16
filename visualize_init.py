@@ -16,6 +16,7 @@ from gbp import GBP
 parser = argparse.ArgumentParser(
         description = 'PyTorch 2.5D Action Recognition ResNet Visualization with Guided Backprop')
 
+parser.add_argument('dataset_path', help = 'path to directories of rgb frames')
 parser.add_argument('model_path', help = 'path to pretrained model')
 parser.add_argument('test_video', help = 'video name to be visualized')
 
@@ -27,13 +28,19 @@ parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of 
 
 args = parser.parse_args()
 
+# device where model params to be put on
 device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
 p = torch.load(args.model_path, map_location = 'cuda:0')
 
 # read in the testing frames
-frame_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/' + args.test_video
+frame_path = args.dataset_path + '/' + args.test_video
 test_frame = load_clips(frame_path, 128, 171, 112, 112, args.frame_num)
 test_frame = torch.tensor(test_frame).requires_grad_().to(device)
+
+# read in the UCF class labels for visualization purpose
+class_f = open('mapping/UCF-101/classInd.txt', 'r')
+class_raw_str = class_f.read().split('\n')[:-1]
+class_label = [raw_str.split(' ')[1] for raw_str in class_raw_str]
 
 # initialize the forward prop network
 # endpoint indicates conv block at which forward prop stops
@@ -44,163 +51,43 @@ model = R2Plus1DNet(
 
 # load the pretrained model into memory
 model.load_state_dict(p['content']['rgb']['split1']['state_dict'], strict = False)
-## put the model into evaluation mode and empty the gradient
-#model.eval()
-#model.zero_grad()
 
+# retrieve gradients, scores, and saliency maps through guided backprop
 gbp = GBP(model)
 x_grads = gbp.compute_grad(test_frame, args.filter_pos)
-#test_frame.grad.data.zero_()
+saliency = gbp.compute_abs_saliency(x_grads)
 
-col = 2
-row = 8
+# visualize the output
 
-fig = plt.figure(figsize = (col * 4, row * 4))
-#plt.title('Original Frames', loc = 'left')
-plt.axis('off')
-for i in range(0, test_frame.shape[2] * 2):
-    if i % 2:
-        img = np.array(x_grads[0, :, i//2, :, :]).transpose((1, 2, 0))
-    else:
-        img = test_frame[0, :, i//2, :, :].cpu().detach().numpy().transpose((1, 2, 0))
-        
-    img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-    fig.add_subplot(row, col, i + 1)
+
+def get_prediction(scores, top_k, class_label):
+    
+    scores = scores.cpu().detach().numpy()
+    indices = np.argsort(scores, axis = 1)[0, (101 - top_k) :][::-1]
+    return {class_label[index] : scores[0, index] for index in indices}
+
+def testvis():
+
+    col = 3
+    row = args.frame_num
+    
+    fig = plt.figure(figsize = (col * 4, row * 4))
+    #plt.title('Original Frames', loc = 'left')
     plt.axis('off')
-    plt.imshow(img)
-plt.subplots_adjust(hspace=0, wspace=0)
-plt.show()
-
-#fig = plt.figure(figsize = (col * 4, row * 4))
-#plt.title('GBP COLOR', loc = 'left')
-#plt.axis('off')
-#for i in range(0, x_grads.shape[2]):
-#    img = np.array(x_grads[0, :, i, :, :]).transpose((1, 2, 0))
-#    img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-#    fig.add_subplot(row, col, i + 1)
-#    plt.axis('off')
-#    plt.imshow(img)
-#plt.subplots_adjust(hspace=0.1, wspace=0.1)
-#plt.show()
-
-## retrieve only activations of the first clip
-#feature_map = feature_map[0, :, :, :, :]
-#
-## retrieve top 9 most activated feature maps
-#top_k = 9
-#activation_sum = feature_map.sum(dim = (1, 2, 3))
-#top_index = activation_sum.argsort(dim = 0, descending = True)[:top_k]
-#
-## convert feature maps back to 5d tensor
-#feature_map = torch.unsqueeze(feature_map, 0)
-#
-#from deconvnet import SpatioTemporalDeconv
-#from collections import OrderedDict
-#
-## initialize the back prop deconvnet network
-#de_model = SpatioTemporalDeconv(64, 3, (3, 7, 7), stride = (1, 2, 2), 
-#                                 inter_planes = 45, temporal_relu = True).to(device)
-##feature_map = feature_map.to(device)
-#
-## extract keys for pretrained conv layer params
-#conv_params_keys = [
-#        'net.conv1.spatial_conv.conv.spatial_conv.weight',
-#        'net.conv1.temporal_conv.conv.temporal_conv.weight'
-#        ]
-#
-## extract keys for deconv layer params
-#deconv_params_keys = list(de_model.state_dict().keys())
-#
-## length of conv params and deconv params must be the same
-#assert(len(conv_params_keys) == len(deconv_params_keys))
-#
-## extract the conv pretrained params and prepare the deconv params dict
-#conv_params = p['content']['rgb']['split1']['state_dict']
-#deconv_params = OrderedDict({})
-#
-## exchange in and out channels
-## flip the params of all 3d filters
-#for i in range(len(conv_params_keys)):
-#    p = conv_params[conv_params_keys[i]]
-#    p = torch.transpose(p, 0, 1)
-#    p = torch.flip(p, [2, 3, 4])
-#    deconv_params[deconv_params_keys[i]] = p
-#
-## load the modified params into deconvnet
-#de_model.load_state_dict(deconv_params)
-#
-## display original frame images
-#col = 8
-#row = 1
-##row = vis.shape[2] // col + 1
-#
-#fig = plt.figure(figsize = (col * 2, row * 2))
-#plt.title('Original Frames', loc = 'left')
-#plt.axis('off')
-#for i in range(0, test_frame.shape[2]):
-#    img = np.array(test_frame[0, :, i, :, :].cpu()).transpose((1, 2, 0))
-#    img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-#    fig.add_subplot(row, col, i + 1)
-#    plt.axis('off')
-#    plt.imshow(img)
-#plt.subplots_adjust(hspace=0.1, wspace=0.1)
-#plt.show()
-#
-## compute feature input volume of deconvnet
-#s = feature_map.shape
-#feature_x = torch.empty(top_k, s[1], s[2], s[3], s[4])
-#
-#for i in range(top_k):
-#    map_x = feature_map.clone()
-#    for k in range(0, feature_map.shape[1]):
-#        if k != top_index[i].item():
-#            map_x[0, k, :, :, :] = 0
-#    feature_x[i, :, :, :, :] = map_x[0, :, :, :, :].clone()
-#    
-#de_model.eval()
-#feature_x = feature_x.to(device)
-#with torch.set_grad_enabled(False):
-#    vis = de_model(feature_x)
-#    
-#for i in range(vis.shape[0]):
-#    fig = plt.figure(figsize = (col * 2, row * 2))
-#    title = 'CONV_1 Feature Map [' + str(top_index[i].item()) + ']'
-#    plt.title(title, loc = 'left')
-#    plt.axis('off')
-#    for j in range(0, vis.shape[2]):
-#        img = np.array(vis[i, :, j, :, :].cpu()).transpose((1, 2, 0))
-#        img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-#        fig.add_subplot(row, col, j + 1)
-#        plt.axis('off')
-#        plt.imshow(img)
-#    plt.subplots_adjust(hspace=0.1, wspace=0.1)
-#    plt.show()
-
-## for each top activations, visualize it
-#for i in range(top_k):
-#    cur_act = top_index[i]
-#    
-#    # make all activations to 0 except for current k activation
-#    map_x = feature_map.clone()
-#    for k in range(0, feature_map.shape[1]):
-#        if k != cur_act.item():
-#            map_x[0, k, :, :, :] = 0
-#    
-#    # conpute the visualized matrices with deconvnet
-#    de_model.eval()
-#    with torch.set_grad_enabled(False):
-#        vis = de_model(map_x)
-#        
-#    # display the visualized image of current activation
-#    fig = plt.figure(figsize = (col * 2, row * 2))
-#    title = 'CONV_1 Feature Map [' + str(cur_act.item()) + ']'
-#    plt.title(title, loc = 'left')
-#    plt.axis('off')
-#    for j in range(0, vis.shape[2]):
-#        img = np.array(vis[0, :, j, :, :].cpu()).transpose((1, 2, 0))
-#        img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
-#        fig.add_subplot(row, col, j + 1)
-#        plt.axis('off')
-#        plt.imshow(img)
-#    plt.subplots_adjust(hspace=0.1, wspace=0.1)
-#    plt.show()
+    for i in range(0, test_frame.shape[2] * col):
+        if i % 3 == 1:
+            img = np.array(x_grads[0, :, i//col, :, :]).transpose((1, 2, 0))
+        elif i % 3 == 0:
+            img = test_frame[0, :, i//col, :, :].cpu().detach().numpy().transpose((1, 2, 0))
+        else:
+            img = saliency[0, :, i//col, :, :].transpose((1, 2, 0))
+            
+        img = ((img - img.min()) / (img.max() - img.min()) * 255).astype(np.uint8)
+        fig.add_subplot(row, col, i + 1)
+        plt.axis('off')
+        plt.imshow(img)
+    plt.subplots_adjust(hspace=0, wspace=0)
+    
+    return plt
+    
+testvis().show()
