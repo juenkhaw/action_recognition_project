@@ -11,13 +11,7 @@ import cv2
 
 from gbp_video_module import denormalize_buffer
 
-def get_prediction(scores, top_k, class_label):
-    
-    scores = scores.cpu().detach().numpy()
-    indices = np.argsort(scores, axis = 1)[0, (101 - top_k) :][::-1]
-    return {class_label[index] : scores[0, index] for index in indices}
-
-def plt_maps(args, test_frame, x_grads, pos_sal, neg_sal, label):
+def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label):
     
     contents = [test_frame.cpu().detach().numpy(), x_grads, pos_sal, neg_sal]
     titles = ['Original Frame', 'Gradient Map', 'Positive Saliency', 'Negative Saliency']
@@ -42,6 +36,43 @@ def plt_maps(args, test_frame, x_grads, pos_sal, neg_sal, label):
         
         plt.axis('off')
         plt.imshow(img)
+        
+    plt.subplots_adjust(hspace=0, wspace=0)
+    
+    return plt
+
+def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label):
+    
+    contents = [test_frame.cpu().detach().numpy(), x_grads, pos_sal, neg_sal]
+    titles = ['Original Frame', 'Gradient Map', 'Positive Saliency', 'Negative Saliency']
+
+    col = args.frame_num + 1
+    row = 4
+    
+    fig = plt.figure(figsize = (col * 3, row * 3))
+    plt.title(label + ' (' + str(args.test_label + 1) + ')\n'
+              + str(col - 1) + ' frames (' + args.test_video + ')\n',
+              fontdict = {'fontsize' : 16}, loc = 'left')
+    plt.axis('off')
+    
+    for i in range(0, row):
+        
+        for j in range(0, col):
+            ax = fig.add_subplot(row, col, i * col + j + 1)
+            if j > 0:
+                img = contents[i][0, :, j - 1].transpose((1, 2, 0))
+                img = denormalize_buffer(img)
+            else:
+                img = np.ones((112, 112, 3)).astype(np.uint8) * 255
+                plt.text(0.5, 0.5, titles[i], fontsize = 16,
+                         horizontalalignment = 'center', 
+                         verticalalignment = 'center', 
+                         transform = ax.transAxes)
+                #ax.set_title(titles[i], loc = 'center')
+                #ax.set_text(0.5, 0.5, titles[i])
+            
+            plt.axis('off')
+            plt.imshow(img)
         
     plt.subplots_adjust(hspace=0, wspace=0)
     

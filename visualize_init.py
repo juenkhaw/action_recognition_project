@@ -10,7 +10,7 @@ import torch
 from network_r2p1d import R2Plus1DNet
 from gbp_video_module import load_clips
 from gbp import GBP
-from visualize_demo_misc import plt_maps, cv2_maps
+from visualize_demo_misc import plt_maps_vertical, plt_maps_horizontal, cv2_maps
 
 parser = argparse.ArgumentParser(
         description = 'PyTorch 2.5D Action Recognition ResNet Visualization with Guided Backprop')
@@ -58,5 +58,5 @@ x_grads = gbp.compute_grad(test_frame, args.filter_pos)
 pos_sal, neg_sal = gbp.compute_saliency(x_grads)
 
 # visualize the output    
-plt_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
-cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label])
+plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
+#cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label])
