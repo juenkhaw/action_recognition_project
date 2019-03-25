@@ -57,6 +57,7 @@ gbp = GBP(model)
 x_grads = gbp.compute_grad(test_frame, args.filter_pos)
 pos_sal, neg_sal = gbp.compute_saliency(x_grads)
 
-# visualize the output    
-plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
+# visualize the output
+#plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()    
+plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
 #cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label])
