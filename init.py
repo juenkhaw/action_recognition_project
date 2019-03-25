@@ -62,6 +62,8 @@ parser.add_argument('-saveintv', '--save-interval', help = 'save model after run
 parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
+# special case
+parser.add_argument('-mwfpretrain', '--mwfpretrain', help = 'apply pretrained model on stream networks', action = 'store_true', default = False)
 
 args = parser.parse_args()
 
@@ -109,7 +111,7 @@ splits = [args.split] if args.split != 0 else list(range(1, 4))
 
 # prepare pretrained model
 if args.load_model is not None:
-    content = torch.load(args.load_model)['content']
+    content = torch.load(args.load_model, map_location = {'cuda:2': 'cpu'})['content']
 
 try:
 
@@ -127,7 +129,9 @@ try:
         else:
             model = network(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                                 fusion = args.fusion, endpoint = fusion_endpoint[args.fusion], 
-                                verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson)
+                                verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson, 
+                                load_pretrained_stream = args.mwfpretrain, 
+                                load_pretrained_fusion = args.load_model is not None)
         
         # initialize the model parameters according to msra_fill initialization
         # DISABLED as it worsens the optimization
@@ -204,6 +208,7 @@ try:
                                     train_loss = train_loss,
                                     train_elapsed = train_elapsed,
                                     state_dict = model.state_dict(),
+                                    stream_weight = model.stream_weights if isinstance(model, FusionNet) else None,
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
                                     epoch = args.epoch
@@ -211,7 +216,9 @@ try:
                 
             else:
                 train_loss, train_acc, train_elapsed = train_model(
-                        args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler)
+                        args, device, model, dataloaders, optimizer, criterion, scheduler = scheduler,
+                        pretrained_content = content if args.load_model is not None else None, 
+                        modality = modality, split = split, save_content = save_content)
             
         testing_content = {}
         
@@ -221,6 +228,10 @@ try:
             # removed clip-level prediction if -runalltest
             pred_levels = [args.load_mode] if not args.run_all_test else ['video']
             top_acc = [args.top_acc] if not args.run_all_test else [1, 5]
+            
+            # load the stream weightages if it is a fusion network
+            if args.load_model is not None and isinstance(model, FusionNet):
+                model.stream_weights = content[modality]['split'+str(split)]['stream_weight']
             
             # initialize testing dataset for clip/video level predictions
             if datasetClass == VideoDataset:

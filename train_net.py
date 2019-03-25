@@ -10,6 +10,7 @@ import time
 import torch
 
 from network_r2p1d import R2Plus1DNet
+from fusion_network import FusionNet
 
 def generate_subbatches(sbs, *tensors):
     
@@ -79,6 +80,9 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
         optimizer.load_state_dict(pretrained_content[modality]['split'+str(split)]['opt_dict'])
         if scheduler is not None:
             scheduler.load_state_dict(pretrained_content[modality]['split'+str(split)]['sch_dict'])
+        if pretrained_content[modality]['split'+str(split)]['stream_weight'] is not None:
+            model.stream_weights = pretrained_content[modality]['split'+str(split)]['stream_weight']
+            
     # else initializing them with emptiness
     else:
         train_loss = []
@@ -218,6 +222,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                                 train_loss = train_loss,
                                 train_elapsed = time.time() - start,
                                 state_dict = model.state_dict(),
+                                stream_weight = model.stream_weights if isinstance(model, FusionNet) else None, 
                                 opt_dict = optimizer.state_dict(),
                                 sch_dict = scheduler.state_dict() if scheduler is not None else {},
                                 epoch = epoch + 1)
