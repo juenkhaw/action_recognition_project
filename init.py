@@ -230,8 +230,9 @@ try:
             top_acc = [args.top_acc] if not args.run_all_test else [1, 5]
             
             # load the stream weightages if it is a fusion network
-            if args.load_model is not None and isinstance(model, FusionNet):
-                model.stream_weights = content[modality]['split'+str(split)]['stream_weight']
+            if args.load_model is not None and isinstance(model, FusionNet) and args.fusion is not 'average':
+                #model.stream_weights = content[modality]['split'+str(split)]['stream_weight']
+                pass
             
             # initialize testing dataset for clip/video level predictions
             if datasetClass == VideoDataset:

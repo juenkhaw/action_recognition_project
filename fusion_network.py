@@ -30,9 +30,11 @@ class FusionNet(nn.Module):
         self.rgb_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['rgb'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint, 
                                name = 'R2P1D_RGB', verbose = verbose)
+        
         self.flow_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['flow'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint,
                                name = 'R2P1D_FLOW', verbose = verbose)
+        
         self.stream_weights = None
         
         if self._fusion != 'average':
@@ -45,32 +47,31 @@ class FusionNet(nn.Module):
             
         # REFACTOR REQUIRED!!!
         # load pre-trained stream model 
-        if load_pretrained_stream and self._fusion == 'modality-wf':
+        if load_pretrained_stream:
             
             print('ENTERED EASTER EGG OF PRELOADING!!')
             
-            from collections import OrderedDict
+            if not load_pretrained_fusion:
             
-            # stream network preloading
-            content = torch.load('run1_avgfusion.pth.tar', map_location = {'cuda:2' : 'cuda:0'})
-            state = content['content']['2-stream']['split1']['state_dict']
-            self.load_state_dict(state, strict = False)
-            
-            # copy weights from stream linear to local linear
-            local_rgb_linear = OrderedDict({
-                    'weight' : state['rgb_net.linear1.weight'],
-                    'bias' : state['rgb_net.linear1.bias'],
-                    })
-            local_flow_linear = OrderedDict({
-                    'weight' : state['flow_net.linear1.weight'],
-                    'bias' : state['flow_net.linear1.bias'],
-                    })
-            self.linear1_rgb.load_state_dict(local_rgb_linear)
-            self.linear1_flow.load_state_dict(local_flow_linear)
-            
-        # Load pre-trained fusion model (including fusion network)
-        if load_pretrained_fusion or load_pretrained_stream:
-            
+                from collections import OrderedDict
+                
+                # stream network preloading
+                content = torch.load('run1_avgfusion.pth.tar', map_location = {'cuda:2' : 'cuda:0'})
+                state = content['content']['2-stream']['split1']['state_dict']
+                self.load_state_dict(state, strict = False)
+                
+                # copy weights from stream linear to local linear
+                local_rgb_linear = OrderedDict({
+                        'weight' : state['rgb_net.linear1.weight'],
+                        'bias' : state['rgb_net.linear1.bias'],
+                        })
+                local_flow_linear = OrderedDict({
+                        'weight' : state['flow_net.linear1.weight'],
+                        'bias' : state['flow_net.linear1.bias'],
+                        })
+                self.linear1_rgb.load_state_dict(local_rgb_linear)
+                self.linear1_flow.load_state_dict(local_flow_linear)
+                
             # freeze!
             for params in self.linear1_rgb.parameters():
                 params.requires_grad = False
@@ -80,8 +81,7 @@ class FusionNet(nn.Module):
             for params in self.rgb_net.parameters():
                 params.requires_grad = False
             for params in self.flow_net.parameters():
-                params.requires_grad = False
-            
+                params.requires_grad = False  
         
     def forward(self, x_rgb, x_flow):
         
