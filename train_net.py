@@ -10,7 +10,7 @@ import time
 import torch
 
 from network_r2p1d import R2Plus1DNet
-from fusion_network import FusionNet
+from fusion_network import FusionNet, FusionNet2
 
 def generate_subbatches(sbs, *tensors):
     
@@ -143,10 +143,10 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                             
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-                            _, preds = torch.max(outputs, 1)
+                            _, preds = torch.max(outputs['SCORES'], 1)
                             
                             # compute the loss
-                            loss = criterion(outputs, sub_labels[sb])
+                            loss = criterion(outputs['SCORES'], sub_labels[sb])
                             
                             loss.backward()
                             
@@ -181,22 +181,53 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                     with torch.set_grad_enabled(phase == 'train'):
                         outputs = torch.tensor([], dtype = torch.float).to(device)
                         for sb in range(len(sub_rgbX)):
-                            #print(sub_rgbX[sb].shape)
+                            
                             # compute the final scores
                             outputs = model(sub_rgbX[sb], sub_flowX[sb])
                             
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-                            _, preds = torch.max(outputs, 1)
+#                            _, preds = torch.max(outputs['FUSION_SCORES'], 1)
+#                            _, preds1 = torch.max(outputs['RGB_SCORES'], 1)
+#                            _, preds2 = torch.max(outputs['FLOW_SCORES'], 1)
+#                            
+#                            print(preds, preds1, preds2)
+#                            print(list(model.rgb_net.parameters())[0].requires_grad)
                             
                             # compute the loss
-                            loss = criterion(outputs, sub_labels[sb])
-                            
-                            loss.backward()
+                            if not model.pretrained_streams:
+                                rgb_loss = criterion(outputs['RGB_SCORES'], sub_labels[sb])
+                                flow_loss = criterion(outputs['FLOW_SCORES'], sub_labels[sb])
+                                
+                            fusion_loss = criterion(outputs['FUSION_SCORES'], sub_labels[sb])
                             
                             # accumulate loss and true positive for the current subbatch
-                            current_loss += loss.item() * sub_rgbX[sb].size(0)
+                            current_loss += fusion_loss.item() * sub_rgbX[sb].size(0)
                             current_correct += torch.sum(preds == sub_labels[sb].data)
+                            
+                            if not model.pretrained_streams:
+                                # backprop on stream network first
+                                rgb_loss.backward(retain_graph = True)
+                                flow_loss.backward(retain_graph = True)
+                                
+                                # freeze the stream before backprop on fusion network
+                                model.freeze_stream()
+                                fusion_loss.backward()
+                                model.freeze_stream(unfreeze = True)
+                                
+                            else:
+                                fusion_loss.backward()
+#                                                        
+#                            _, preds = torch.max(outputs, 1)
+#                            
+#                            # compute the loss
+#                            loss = criterion(outputs, sub_labels[sb])
+#                            
+#                            loss.backward()
+#                            
+#                            # accumulate loss and true positive for the current subbatch
+#                            current_loss += loss.item() * sub_rgbX[sb].size(0)
+#                            current_correct += torch.sum(preds == sub_labels[sb].data)
                         
                         # update parameters if it is training phase
                         if phase == 'train':
@@ -222,7 +253,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                                 train_loss = train_loss,
                                 train_elapsed = time.time() - start,
                                 state_dict = model.state_dict(),
-                                stream_weight = model.stream_weights if isinstance(model, FusionNet) else None, 
+                                stream_weight = model.stream_weights if isinstance(model, FusionNet2) else None, 
                                 opt_dict = optimizer.state_dict(),
                                 sch_dict = scheduler.state_dict() if scheduler is not None else {},
                                 epoch = epoch + 1)

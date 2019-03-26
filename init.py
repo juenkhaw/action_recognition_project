@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 
 from dataset import VideoDataset, TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
-from fusion_network import FusionNet
+from fusion_network import FusionNet, FusionNet2
 from train_net import train_model, save_training_model
 from test_net import test_model
 
@@ -100,7 +100,7 @@ if args.modality != '2-stream':
 else:
     if args.fusion != 'none':
         modalities = ['2-stream']
-        network = FusionNet
+        network = FusionNet2
         datasetClass = TwoStreamDataset
     else:
         modalities = ['rgb', 'flow']
@@ -131,7 +131,7 @@ try:
                                 fusion = args.fusion, endpoint = fusion_endpoint[args.fusion], 
                                 verbose = args.verbose1, bn_momentum = args.bn_momentum, bn_epson = args.bn_epson, 
                                 load_pretrained_stream = args.mwfpretrain, 
-                                load_pretrained_fusion = args.load_model is not None)
+                                load_fusion_state = args.load_model is not None)
         
         # initialize the model parameters according to msra_fill initialization
         # DISABLED as it worsens the optimization
@@ -208,7 +208,7 @@ try:
                                     train_loss = train_loss,
                                     train_elapsed = train_elapsed,
                                     state_dict = model.state_dict(),
-                                    stream_weight = model.stream_weights if isinstance(model, FusionNet) else None,
+                                    stream_weight = model.stream_weights if isinstance(model, FusionNet2) else None,
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
                                     epoch = args.epoch
@@ -230,9 +230,8 @@ try:
             top_acc = [args.top_acc] if not args.run_all_test else [1, 5]
             
             # load the stream weightages if it is a fusion network
-            if args.load_model is not None and isinstance(model, FusionNet) and args.fusion is not 'average':
-                #model.stream_weights = content[modality]['split'+str(split)]['stream_weight']
-                pass
+            if args.load_model is not None and isinstance(model, FusionNet2) and args.fusion is not 'average':
+                model.stream_weights = content[modality]['split'+str(split)]['stream_weight']
             
             # initialize testing dataset for clip/video level predictions
             if datasetClass == VideoDataset:

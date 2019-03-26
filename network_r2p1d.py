@@ -202,21 +202,23 @@ class R2Plus1DNet(nn.Module):
         'Conv3d_5_x',
         'AP',
         'FC',
+        'SCORES',
         'SOFTMAX'
     )
     
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
                  in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True, 
-                 endpoint = 'FC'):
+                 endpoint = ['FC']):
             
         super(R2Plus1DNet, self).__init__()
         
         self._num_classes = num_classes
         self._verbose = verbose
-        if endpoint in self.VALID_ENDPOINTS:
-            self._endpoint = endpoint
-        else:
-            self._endpoint = 'FC'
+        
+        # validate list of endpoint
+        for endp in endpoint:
+            assert endp in self.VALID_ENDPOINTS
+        self._endpoint = endpoint
         
         self.net = nn.Sequential(OrderedDict([
                 ('conv1',
@@ -266,6 +268,8 @@ class R2Plus1DNet(nn.Module):
         
     def forward(self, x):
         
+        final_out = {}
+        
         # perform each module until reaching final endpoint
         if self._verbose:
             print('Input', x.shape)
@@ -274,8 +278,8 @@ class R2Plus1DNet(nn.Module):
             x = self.net[i](x)
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
-            if self._endpoint == self.VALID_ENDPOINTS[i]:
-                return x
+            if self.VALID_ENDPOINTS[i] in self._endpoint:
+                final_out[self.VALID_ENDPOINTS] = x
         
         # pre-fc
         x = self.avgpool(x)
@@ -283,31 +287,34 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Pre FC', x.shape)
             
-        if self._endpoint == 'AP':
-            return x
+        if 'AP' in self._endpoint:
+            final_out['AP'] = x
         
         # fc linear layer
         x = self.linear1(x)
         if self._verbose:
             print('Post FC', x.shape)
         
-        if self._endpoint == 'SOFTMAX':
-            return self.softmax(x)
+        if 'SOFTMAX' in self._endpoint:
+            final_out['SOFTMAX'] = self.softmax(x)
         else:
-            return x
+            final_out['SCORES'] = x
+            
+        return final_out
 
 if __name__ is '__main__':
-    device = torch.device('cpu')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True).to(device)
+    device = torch.device('cuda:0')
+    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True, 
+                        endpoint = ['AP', 'SCORES']).to(device)
     
-    from torchsummary import summary
-    summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
+    #from torchsummary import summary
+    #summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
     
     #module.model_summary(model)
     #module.msra_init(model)
 
-    #x = torch.randn((1, 2, 8, 112, 112)).to(device)
-    #model(x)
+    x = torch.randn((1, 3, 8, 112, 112)).to(device)
+    out = model(x)
     
 #    try:
 #        model(x)
