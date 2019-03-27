@@ -9,6 +9,8 @@ import torch.nn as nn
 
 from network_r2p1d import R2Plus1DNet
 
+gpu_name = 'cuda:0'
+
 class FusionNet(nn.Module):
     
     in_channels = {'rgb': 3, 'flow': 1}
@@ -50,7 +52,7 @@ class FusionNet(nn.Module):
             if not load_pretrained_fusion:
                 
                 # stream network preloading
-                content = torch.load('run1_avgfusion.pth.tar', map_location = {'cuda:2' : 'cuda:0'})
+                content = torch.load('run1_avgfusion.pth.tar', map_location = {'cuda:2' : gpu_name})
                 state = content['content']['2-stream']['split1']['state_dict']
                 self.load_state_dict(state, strict = False)
                 
@@ -154,8 +156,8 @@ class FusionNet2(nn.Module):
             if not load_fusion_state:
             
                 # stream network preloading
-                rgb_state = torch.load('run3_rgb.pth.tar', map_location = {'cuda:2' : 'cuda:0'})['content']['rgb']['split1']['state_dict']
-                flow_state = torch.load('run3_flow.pth.tar', map_location = {'cuda:2' : 'cuda:0'})['content']['flow']['split1']['state_dict']
+                rgb_state = torch.load('run3_rgb.pth.tar', map_location = {'cuda:2' : gpu_name})['content']['rgb']['split1']['state_dict']
+                flow_state = torch.load('run3_flow.pth.tar', map_location = {'cuda:2' : gpu_name})['content']['flow']['split1']['state_dict']
                 
                 self.rgb_net.load_state_dict(rgb_state)
                 self.flow_net.load_state_dict(flow_state)
