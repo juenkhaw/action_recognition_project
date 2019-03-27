@@ -75,7 +75,8 @@ print(args)
 
 # Allocate device (gpu/cpu) to be used in training and testing
 # CRITICAL SETTINGS OF DEFAULT GPU HOLDING ALL THE TENSORS
-device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
+gpu_name = 'cuda:0'
+device = torch.device(gpu_name if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
 num_devices = torch.cuda.device_count() 
 num_workers = num_devices if args.worker_num == -1 else args.worker_num
 
@@ -111,7 +112,7 @@ splits = [args.split] if args.split != 0 else list(range(1, 4))
 
 # prepare pretrained model
 if args.load_model is not None:
-    content = torch.load(args.load_model, map_location = {'cuda:2': 'cpu'})['content']
+    content = torch.load(args.load_model, map_location = {'cuda:2': gpu_name})['content']
 
 try:
 
