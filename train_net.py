@@ -187,7 +187,7 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                             
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-#                            _, preds = torch.max(outputs['FUSION_SCORES'], 1)
+                            _, preds = torch.max(outputs['FUSION_SCORES'], 1)
 #                            _, preds1 = torch.max(outputs['RGB_SCORES'], 1)
 #                            _, preds2 = torch.max(outputs['FLOW_SCORES'], 1)
 #                            
