@@ -1,7 +1,7 @@
-# Backward Propagation with R(2+1)D Action Recognition RGB Stream Network
+# Guided Backward Propagation with R(2+1)D Action Recognition RGB Stream Network
 ### Running
 
-Please run on `visualize_init.py` with one of the arguments set provided below:
+Please run on `visualize_init.py` with the arguments set provided below:
 
 **Visualize with GPU**
 
@@ -32,7 +32,7 @@ https://github.com/feichtenhofer/twostreamfusion
 
 ### Output
 
-The output file should contain series of gradient maps, positive saliency and negative saliency for each respective RGB frames following its temporal timeline:
+The output should contain series of gradient maps, positive saliency and negative saliency for each respective RGB frames following its temporal timeline:
 
 ![Walking with dog sample](https://github.com/juenkhaw/action_recognition_project/blob/vis-module/v_WalkingWithDog_g01_c01.png)
 
