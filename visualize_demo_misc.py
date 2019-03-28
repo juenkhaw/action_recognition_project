@@ -128,6 +128,6 @@ def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label):
                                         (j + 1) * img_w + space * (j + 1), :], img)
         # show results
         cv2.imshow('RESULT', output_frames)
-        cv2.waitKey(800 if i != args.frame_num - 1 else 0)
+        cv2.waitKey(1000 if i < args.frame_num - 1 and i > 0 else 0)
     
     cv2.destroyAllWindows()
