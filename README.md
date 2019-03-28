@@ -3,6 +3,12 @@
 
 Please run on `init.py` with one of the arguments set provided below:
 
+**Training from scratch on fusion network with pretrained stream networks**
+
+The pretrained stream network model packages are expected to be put in the same folder as the script.
+
+`ucf 2-stream [dataset_path] -fusion [fusion_method] -train -loadmodel [model_path]` -cl 8 -ld 18 -test -runalltest -dv gpu -save -savename [output_name] -v2 -mwfpretrain`
+
 **Continue training on previous model (two-stream)**
 
 `ucf 2-stream [dataset_path] -fusion [fusion_method] -train -loadmodel [model_path] -cl 8 -ld 18 -test -runalltest -dv gpu -save -savename [output_name] -v2`
@@ -77,6 +83,7 @@ output.pth.tar
       |-train_loss
       |-train_elapsed
       |-state_dict
+      |-stream_weight
       |-opt_dict
       |-sch_dict
       |-epoch
@@ -104,6 +111,7 @@ output.pth.tar
 - `-gm` lr decaying rate
 - `-mo` momemntum for batch normalization
 - `-es` epson for batch normalization
+- `-mwfpretrain` apply pretrained model on stream networks
 
 **Fusion method**
 
