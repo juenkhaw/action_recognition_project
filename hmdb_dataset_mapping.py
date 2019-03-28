@@ -3,6 +3,8 @@
 Created on Mon Feb  4 18:35:56 2019
 
 @author: Juen
+
+RUN THIS SCRIPT ONLY WHEN YOU DO NOT HAVE THE MODIFIED HMDB MAPPING FILE
 """
 
 import os

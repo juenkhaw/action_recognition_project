@@ -12,6 +12,26 @@ from network_r2p1d import R2Plus1DNet
 gpu_name = 'cuda:0'
 
 class FusionNet(nn.Module):
+    """
+    [Deprecated]
+    Fusion network that incorporates with two stream networks from different modalities, it contains various
+    type of fusion method to fuse outputs from stream networks and produce a final score/prediction
+    
+    Constructor requires:
+        layer_sizes : list of integer indicating repetation count of residual blocks at each phase
+        num_classess : total label count
+        device : device id to be used on training/testing
+        network : type of stream network
+        fusion : fusion method to be used, averaging or modality-wf
+        endpoint : list of endpoints on the network where output would be returned
+        bn_momentum : BN momentum hyperparameter
+        bn_epson : BN epsilon hyperparameter
+        name : module name
+        verbose : prints activation output size after each phases or not
+        load_pretrained_stream : whether to load individually pre-trained stream network state
+        load_pretrained_fusion : indicating whether the entire fusion network is loaded with previous
+        state in main function
+    """
     
     in_channels = {'rgb': 3, 'flow': 1}
     
@@ -25,10 +45,12 @@ class FusionNet(nn.Module):
         self._num_classes = num_classes
         self._fusion = fusion
         
+        # endpoint should be valid and defined in the R(2+1)D network
         assert(endpoint in network.VALID_ENDPOINTS)
         
         endpoint = ['FC'] if fusion == 'average' else ['AP', 'FC']
         
+        # define rgb and flow stream network
         self.rgb_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['rgb'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint, 
                                name = 'R2P1D_RGB', verbose = verbose)
@@ -37,8 +59,10 @@ class FusionNet(nn.Module):
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint,
                                name = 'R2P1D_FLOW', verbose = verbose)
         
+        # define stream weightages
         self.stream_weights = None
-            
+        
+        # define fusion architecture for madality-wf
         if self._fusion == 'modality-wf':
             self.linear = nn.Linear(1024, 2)
             self.softmax = nn.Softmax(dim = 1)
@@ -49,6 +73,7 @@ class FusionNet(nn.Module):
             
             print('ENTERED EASTER EGG OF PRELOADING!!')
             
+            # if it is not loaded in main function from previous fusion network state
             if not load_pretrained_fusion:
                 
                 # stream network preloading
@@ -81,14 +106,18 @@ class FusionNet(nn.Module):
         
     def forward(self, x_rgb, x_flow):
         
+        # get (list of) outputs from each stream networks
         rgb_out = self.rgb_net(x_rgb)
         flow_out = self.flow_net(x_flow)
         
+        # averaging method
         if self._fusion == 'average':
             return (rgb_out['SCORES'] + flow_out['SCORES']) / 2
         
+        # modality weighted fusion method
         if self._fusion == 'modality-wf':
             
+            # if the model is in training mode
             if self.training:
                 
                 # taking the average of final feature activations over samples for each modalities
@@ -115,6 +144,26 @@ class FusionNet(nn.Module):
                 return rgb_out['SCORES'] * self.stream_weights[0, 0] + flow_out['SCORES'] * self.stream_weights[0, 1]
             
 class FusionNet2(nn.Module):
+    """
+    Revised version of fusion network that is capable of loading stream networks with individually trained model
+    state, and with standard practice of backward propagation, with freezing of stream networks and supports
+    backward on several endpoints instead of just on the last point where the final score is produced
+    
+    Constructor requires:
+        layer_sizes : list of integer indicating repetation count of residual blocks at each phase
+        num_classess : total label count
+        device : device id to be used on training/testing
+        network : type of stream network
+        fusion : fusion method to be used, averaging or modality-wf
+        endpoint : list of endpoints on the network where output would be returned
+        bn_momentum : BN momentum hyperparameter
+        bn_epson : BN epsilon hyperparameter
+        name : module name
+        verbose : prints activation output size after each phases or not
+        load_pretrained_stream : whether to load individually pre-trained stream network state
+        load_fusion_state : indicating whether the entire fusion network is loaded with previous
+        state in main function
+    """
     
     in_channels = {'rgb': 3, 'flow': 1}
     
@@ -128,10 +177,14 @@ class FusionNet2(nn.Module):
         self._num_classes = num_classes
         self._fusion = fusion
         
+        # endpoint should be defined in the R(2+1)D network
         assert(endpoint in network.VALID_ENDPOINTS)
         
+        # returns outputs after FC if using averaging
+        # else, for modality weighted fusion, returns at points after global avg pooling and FC
         endpoint = ['FC'] if fusion == 'average' else ['AP', 'FC']
         
+        # define stream networks
         self.rgb_net = network(layer_sizes, num_classes, device, in_channels = self.in_channels['rgb'], 
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint, 
                                name = 'R2P1D_RGB', verbose = verbose)
@@ -140,9 +193,11 @@ class FusionNet2(nn.Module):
                                bn_momentum = bn_momentum, bn_epson = bn_epson, endpoint = endpoint,
                                name = 'R2P1D_FLOW', verbose = verbose)
         
+        # define stream weightages
         self.stream_weights = None
         self.pretrained_streams = load_pretrained_stream
-            
+        
+        # define architecture of modality weighted fusion
         if self._fusion == 'modality-wf':
             self.linear = nn.Linear(1024, 2)
             self.softmax = nn.Softmax(dim = 1)
@@ -165,6 +220,15 @@ class FusionNet2(nn.Module):
             self.freeze_stream()
             
     def freeze_stream(self, unfreeze = False):
+        """
+        Toggle freezing of stream networks
+        
+        Inputs:
+            unfreeze : set to True to unfreeze
+            
+        Returns:
+            None
+        """
         
         for params in self.rgb_net.parameters():
             params.requires_grad = unfreeze
@@ -176,17 +240,22 @@ class FusionNet2(nn.Module):
         
         final_out = {}
         
+        # retrieve respective (list of) outputs from stream networks
         rgb_out = self.rgb_net(x_rgb)
         flow_out = self.flow_net(x_flow)
         
+        # scores generated from individual stream networks are to be returned
         final_out['RGB_SCORES'] = rgb_out['SCORES']
         final_out['FLOW_SCORES'] = flow_out['SCORES']
         
+        # averaging method
         if self._fusion == 'average':
             final_out['FUSION_SCORES'] = (rgb_out['SCORES'] + flow_out['SCORES']) / 2
-            
+        
+        # modality-specific weighted fusion network
         elif self._fusion == 'modality-wf':
             
+            # if the model is in training mode
             if self.training:
                 
                 # taking the average of final feature activations over samples for each modalities
@@ -210,6 +279,7 @@ class FusionNet2(nn.Module):
             else:
                 final_out['FUSION_SCORES'] = rgb_out['SCORES'] * self.stream_weights[0, 0] + flow_out['SCORES'] * self.stream_weights[0, 1]         
         
+        # return list of outputs
         return final_out
         
 if __name__ is '__main__':

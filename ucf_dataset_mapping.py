@@ -3,6 +3,8 @@
 Created on Mon Feb  4 16:42:46 2019
 
 @author: Juen
+
+RUN THIS SCRIPT ONLY WHEN YOU DO NOT HAVE THE MODIFIED UCF MAPPING FILE
 """
 
 from pathlib import Path

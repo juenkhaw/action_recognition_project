@@ -115,6 +115,15 @@ def normalize_buffer(buffer):
     return buffer
 
 def denormalize_buffer(buffer):
+    """
+    Denormalizes intensity values of input buffer frames
+    
+    Inputs:
+        buffer : np array of normalized frames
+        
+    Returns:
+        buffer : np array of unnormalized frames
+    """
     
     buffer = ((buffer - buffer.min()) / (buffer.max() - buffer.min()) * 255).astype(np.uint8)
     

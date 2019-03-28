@@ -23,6 +23,8 @@ class VideoDataset(Dataset):
         clip_len : [8 / 16] Target depth of training/testing clips
         test_mode : Activates to run on small samples to verify the correctness of implementation
         test_amt : Amount of labelled samples to be used if test_mode is activated
+        laod_mode : select 'clip' for training, while 'video' for testing
+        clips_per_video : number of clips to be contained within one video
     """
     
     def __init__(self, path, dataset, split, mode, modality, clip_len = 16, 
@@ -124,6 +126,19 @@ class VideoDataset(Dataset):
         return len(self._labels)
     
 class TwoStreamDataset(Dataset):
+    """
+    Dataset class that manages both rgb and flow datasets, and load both at once into a DataLoader
+    
+    Constructor requires:
+        dataset : [ucf / hmdb] videoset to be loaded
+        split : [1/2/3] split set to be loaded
+        mode : [train / test] training or testing dataset to be loaded
+        clip_len : [8 / 16] Target depth of training/testing clips
+        test_mode : Activates to run on small samples to verify the correctness of implementation
+        test_amt : Amount of labelled samples to be used if test_mode is activated
+        laod_mode : select 'clip' for training, while 'video' for testing
+        clips_per_video : number of clips to be contained within one video
+    """
     
     def __init__(self, path, dataset, split, mode, clip_len = 16, 
                  test_mode = True, test_amt = 8, 
@@ -138,6 +153,7 @@ class TwoStreamDataset(Dataset):
                                      load_mode = load_mode, clips_per_video = clips_per_video)
         
     def __getitem__(self, index):
+        # returning rgb, flow and labels at once
         rgbX, rgbY = self._rgb_set.__getitem__(index)
         flowX, flowY = self._flow_set.__getitem__(index)
         #print(self._rgb_set._clip_names[index], self._flow_set._clip_names[index])

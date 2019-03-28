@@ -192,6 +192,7 @@ class R2Plus1DNet(nn.Module):
         bn_epson : BN epsilon hyperparameter
         name : module name
         verbose : prints activation output size after each phases or not
+        endpoint : list of endpoints on the network where output would be returned
     """
     
     VALID_ENDPOINTS = (
@@ -270,7 +271,7 @@ class R2Plus1DNet(nn.Module):
         
         final_out = {}
         
-        # perform each module until reaching final endpoint
+        # perform each module and append the output volume when reaching its appointed endpoints
         if self._verbose:
             print('Input', x.shape)
             

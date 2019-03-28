@@ -13,8 +13,19 @@ from network_r2p1d import R2Plus1DNet
 from fusion_network import FusionNet, FusionNet2
 
 def generate_subbatches(sbs, *tensors):
+    """
+    Generate list of subbtaches from a batch of sample data
+    
+    Inputs:
+        tensors : series of tensor batch to be partitioned
+        
+    Returns:
+        subbatches : list of partitioned subbateches
+    
+    """
     
     #print(tensors.__class__)
+    # engulf tensor into a list if there is only one tensor passed in
     if isinstance(tensors, torch.Tensor):
         tensors = [tensors]
         
@@ -22,8 +33,11 @@ def generate_subbatches(sbs, *tensors):
     for i in range(len(tensors)):
         subbatch = []
         part_num = tensors[i].shape[0] // sbs
+        # if subbatch size is lower than the normal batch size
         if sbs < tensors[i].shape[0]:
+            # partitioning batch with subbatch size
             subbatch = [tensors[i][j * sbs : j * sbs + sbs] for j in range(part_num)]
+            # if there is any remainder in the batch
             if part_num * sbs < tensors[i].shape[0]:
                 subbatch.append(tensors[i][part_num * sbs : ])
             subbatches.append(subbatch)
@@ -33,10 +47,24 @@ def generate_subbatches(sbs, *tensors):
     return subbatches if len(tensors) > 1 else subbatches[0]
 
 def save_training_model(args, save_content, modality, split, **contents):
+    """
+    Save the model state after interval of running epochs
     
+    Inputs:
+        args : Program arguments
+        save_content : Accumulated save content
+        modality, split : Recording purpose
+        contetns : New contents with key and values to be added into the save_content
+        
+    Returns:
+        None
+    """
+    
+    # create a new entry with modality as key if it is yet existed
     if modality not in save_content.keys():
         save_content[modality] = {}
-        
+    
+    # update the content of current modality/split
     save_content[modality].update({
         'split' + str(split) : contents
     })
@@ -53,7 +81,8 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
                 pretrained_content = None, modality = None, split = None, save_content = None):
     """
     This function trains (and validates if available) network with appointed training set, optmizer, criterion
-    and scheduler (if available)
+    and scheduler (if available), and save the model after running for an interval of epochs, as well as resuming
+    the training with intermediate model state
     
     Inputs:
         args : arguments dict passed from main function
@@ -63,6 +92,9 @@ def train_model(args, device, model, dataloaders, optimizer, criterion, schedule
         optimizer : optimizer object for parameters learning
         criterion : criterion object for computing loss
         scheduler : scheduler object for learning rate decay
+        pretrained_content : an intermediate model state previously saved
+        modality, split : recording purpose
+        save_content : current content to be saved
         
     Outputs:
         train_loss : list of training loss for each epoch
