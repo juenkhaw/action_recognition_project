@@ -114,6 +114,16 @@ class GBP(object):
         return self.output_grads.cpu().detach().numpy()
     
     def compute_saliency(self, gradient):
+        """
+        Computed saliency maps for magnitude in both direction
+        
+        Inputs:
+            gradient : gradient maps generated from guided backprop
+            
+        Returns:
+            pos_saliency : numpy volume of normalized positive gradient maps
+            neg_saliency : numpy volume of normalized negative gradient maps
+        """
         
         pos_saliency = np.maximum(0, gradient) / np.max(gradient)
         neg_saliency = np.abs(np.maximum(0, -1 * gradient) / np.min(-1 * gradient))

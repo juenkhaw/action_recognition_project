@@ -12,6 +12,21 @@ import cv2
 from gbp_video_module import denormalize_buffer
 
 def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label):
+    """
+    Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
+    in vertical axis as temporal timeline
+    
+    Inputs:
+        args : program arguments
+        test_frame : input volume of testing clip put into the network
+        x_grads : output volume of series of gradient maps
+        pos_sal : output volume of series of postive saliency maps
+        neg_sal : output volume of series of negative saliency maps
+        label : class label index of testing clip
+        
+    Returns:
+        plt : pyplot object containing organized outputs
+    """
     
     contents = [test_frame.cpu().detach().numpy(), x_grads, pos_sal, neg_sal]
     titles = ['Original Frame', 'Gradient Map', 'Positive Saliency', 'Negative Saliency']
@@ -42,6 +57,21 @@ def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label):
     return plt
 
 def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label):
+    """
+    Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
+    in horizontal axis as temporal timeline
+    
+    Inputs:
+        args : program arguments
+        test_frame : input volume of testing clip put into the network
+        x_grads : output volume of series of gradient maps
+        pos_sal : output volume of series of postive saliency maps
+        neg_sal : output volume of series of negative saliency maps
+        label : class label index of testing clip
+        
+    Returns:
+        plt : pyplot object containing organized outputs
+    """
     
     contents = [test_frame.cpu().detach().numpy(), x_grads, pos_sal, neg_sal]
     titles = ['Original Frame', 'Gradient Map', 'Positive Saliency', 'Negative Saliency']
@@ -79,6 +109,21 @@ def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label):
     return plt
 
 def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label):
+    """
+    Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
+    and shows it as an animation with its temporal timeline in a cv2 window
+    
+    Inputs:
+        args : program arguments
+        test_frame : input volume of testing clip put into the network
+        x_grads : output volume of series of gradient maps
+        pos_sal : output volume of series of postive saliency maps
+        neg_sal : output volume of series of negative saliency maps
+        label : class label index of testing clip
+        
+    Returns:
+        none
+    """
     
     contents = [test_frame.cpu().detach().numpy(), x_grads, pos_sal, neg_sal]
     titles = ['Original Frame', 'Gradient Map', 'Positive Saliency', 'Negative Saliency']
