@@ -34,6 +34,7 @@ parser.add_argument('-ss', '--step-size', help = 'decaying lr for each [ss] epoc
 parser.add_argument('-gm', '--lr-decay', help = 'lr decaying rate', default = 0.1, type = float)
 parser.add_argument('-mo', '--bn-momentum', help = 'momemntum for batch normalization', default = 0.1, type = float)
 parser.add_argument('-es', '--bn-epson', help = 'epson for batch normalization', default = 1e-3, type = float)
+parser.add_argument('-mwfpretrain', '--mwfpretrain', help = 'apply pretrained model on stream networks', action = 'store_true', default = False)
 # fusion settings
 parser.add_argument('-fusion', '--fusion', help = 'Fusion method to be used', default = 'none', choices = ['none', 'average', 'modality-wf'])
 # debugging mode settings
@@ -62,8 +63,6 @@ parser.add_argument('-saveintv', '--save-interval', help = 'save model after run
 parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
-# special case
-parser.add_argument('-mwfpretrain', '--mwfpretrain', help = 'apply pretrained model on stream networks', action = 'store_true', default = False)
 
 args = parser.parse_args()
 
