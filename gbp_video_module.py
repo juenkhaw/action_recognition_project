@@ -137,14 +137,14 @@ def load_clips(frames_path, scale_h, scale_w, output_h, output_w, output_len, fr
                                       cv2.IMREAD_COLOR if frame_chn == 3 else cv2.IMREAD_GRAYSCALE)
                 
             if buffer_frame is not None:
-                # revert arangement of colour channels
-                if frame_chn == 3:
-                    buffer_frame = cv2.cvtColor(buffer_frame, cv2.COLOR_BGR2RGB)              
-                
+
                 # resize the frame
                 buffer_frame = cv2.resize(buffer_frame, (scale_w, scale_h))
                 
-                if frame_chn == 1:
+                # revert arangement of colour channels
+                if frame_chn == 3:
+                    buffer_frame = cv2.cvtColor(buffer_frame, cv2.COLOR_BGR2RGB)
+                else:
                     buffer_frame = np.expand_dims(buffer_frame, axis = 2)
                 
                 #print(buffer_frame.shape)

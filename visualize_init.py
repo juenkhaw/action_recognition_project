@@ -19,6 +19,7 @@ parser.add_argument('test_video', help = 'video name to be visualized')
 parser.add_argument('test_label', help = 'label index for the testing video', type = int)
 parser.add_argument('modality', help = 'modality to test on', choices = ['rgb', 'flow'])
 
+parser.add_argument('-visflow', '--visflow', help = 'determine which direction of optical flows to visualize', choices = ['u', 'v'], default = 'u')
 parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
 parser.add_argument('-endp', '--endpoint', help = 'module block where forprop to and backprop from', default = 'Conv3d_5_x')
 parser.add_argument('-filter', '--filter-pos', help = 'filter chosen to be visualised', type = int, default = 0)
@@ -69,6 +70,6 @@ x_grads = gbp.compute_grad(test_frame, args.filter_pos)
 pos_sal, neg_sal = gbp.compute_saliency(x_grads)
 
 # visualize the outputs
-#plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()    
+#plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label], args.visflow).show()    
 #plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
 #cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label])
