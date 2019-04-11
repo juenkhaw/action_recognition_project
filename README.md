@@ -2,9 +2,11 @@
 
 ### Pre-trained Model
 
-Please refer to here for RGB and optical flow stream networks pre-trained on UCF-101:
+Please refer here for RGB and optical flow stream networks pre-trained on UCF-101:
 
 https://drive.google.com/open?id=1_esJwF6I6NFtCWohN2S20b0RJGTehWG0
+
+Please place those files under the same directory containing program source code.
 
 ### Running
 
