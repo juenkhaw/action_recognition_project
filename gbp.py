@@ -133,12 +133,12 @@ class GBP(object):
 #if __name__ == '__main__':
 #    device = torch.device('cuda:0')
 #    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, 
-#                        device = device, in_channels = 3, 
+#                        device = device, in_channels = 1, 
 #                        verbose = True, endpoint = 'Conv3d_5_x').to(device)
 #    
 #    gbp = GBP(model)
 #    
-#    x = torch.randn((1, 3, 8, 112, 112)).requires_grad_().to(device)
+#    x = torch.randn((1, 1, 16, 112, 112)).requires_grad_().to(device)
 #    
 #    gbp.compute_grad(x, 0)
-#        
+        
