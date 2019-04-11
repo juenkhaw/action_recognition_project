@@ -48,13 +48,13 @@ The output should contain series of gradient maps, positive saliency and negativ
 
 **Mandatory**
 
-- `dataset_path` path to directories of rgb frames
-- `model_path` path to pretrained model
 - `test_video` video folder name to be visualized
 - `test_label` label index for the testing video
+- `modality` modality to be tested on
 
 **Optional**
 
+- `-visflow` determine whether to show visualization result on [u or v] optical flows
 - `-dv` device chosen to perform training
 - `-endp` module block where forprop to and backprop from
 - `-filter` filter chosen to be visualised
