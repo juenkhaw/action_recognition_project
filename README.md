@@ -1,4 +1,11 @@
 # Guided Backward Propagation with R(2+1)D Action Recognition RGB and Optical Flow Stream Network
+
+### Pre-trained Model
+
+Please refer to here for RGB and optical flow stream networks pre-trained on UCF-101:
+
+https://drive.google.com/open?id=1_esJwF6I6NFtCWohN2S20b0RJGTehWG0
+
 ### Running
 
 Please run on `visualize_init.py` with the arguments set provided below:
