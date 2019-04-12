@@ -109,7 +109,11 @@ class GBP(object):
         print(output.shape)
         print(filter_pos)
         print(output[0, filter_pos])
-        activation = torch.sum(torch.abs(output[0, filter_pos]))
+        print(len(output.shape))
+        if len(output.shape) > 2:
+            activation = torch.sum(torch.abs(output[0, filter_pos]))
+        else:
+            activation = output[0, filter_pos]
         print(activation.shape)
         # backprop
         activation.backward()
