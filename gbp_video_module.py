@@ -66,7 +66,7 @@ def normalize_buffer(buffer):
     buffer = (buffer - 128) / 128
     return buffer
 
-def denormalize_buffer(buffer):
+def denormalize_buffer(buffer, option = 1):
     """
     Restores the buffer to its original intensity values
     
@@ -78,9 +78,12 @@ def denormalize_buffer(buffer):
     """
     
     # denormalize the intensity with range [0, 255]
-    buffer = ((buffer - buffer.min()) / (buffer.max() - buffer.min()) * 255).astype(np.uint8)
+    if option == 0:
+        buffer = buffer * 128 + 128
+    else:
+        buffer = (buffer - buffer.min()) / (buffer.max() - buffer.min()) * 255
     
-    return buffer
+    return buffer.astype(np.uint8)
 
 def load_clips(frames_path, scale_h, scale_w, output_h, output_w, output_len, frame_chn):
     """

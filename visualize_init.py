@@ -21,13 +21,17 @@ parser.add_argument('modality', help = 'modality to test on', choices = ['rgb', 
 
 parser.add_argument('-visflow', '--visflow', help = 'determine which direction of optical flows to visualize', choices = ['u', 'v'], default = 'u')
 parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
-parser.add_argument('-endp', '--endpoint', help = 'module block where forprop to and backprop from', default = 'Conv3d_5_x')
+parser.add_argument('-endp', '--endpoint', help = 'module block where forprop to and backprop from', default = 'SOFTMAX')
 parser.add_argument('-filter', '--filter-pos', help = 'filter chosen to be visualised', type = int, default = 0)
 parser.add_argument('-nframe', '--frame-num', help = 'frame number for each testing clip', type = int, default = 8)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 
 args = parser.parse_args()
 frame_chnl = 1 if args.modality == 'flow' else 3;
+if args.endpoint == 'SOFTMAX':
+    filter_pos = args.test_label
+else:
+    filter_pos = args.filter_pos
 
 # device where model params to be put on
 device = torch.device('cuda:0' if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
@@ -66,10 +70,10 @@ model.load_state_dict(p['content'][args.modality]['split1']['state_dict'], stric
 
 # retrieve gradients, scores, and saliency maps through guided backprop
 gbp = GBP(model)
-x_grads = gbp.compute_grad(test_frame, args.filter_pos)
+x_grads, scores = gbp.compute_grad(test_frame, filter_pos)
 pos_sal, neg_sal = gbp.compute_saliency(x_grads)
 
 # visualize the outputs
-#plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label], args.visflow).show()    
-#plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label]).show()
-#cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label])
+plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label], flow = args.visflow, scores = scores).show()    
+#plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label], flow = args.visflow, scores = scores).show()
+#cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, class_label[args.test_label], flow = args.visflow, scores = scores)

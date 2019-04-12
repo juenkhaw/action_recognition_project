@@ -106,12 +106,18 @@ class GBP(object):
         output = self.model(input)
         
         # zero out rest of the neurons activation map
+        print(output.shape)
+        print(filter_pos)
+        print(output[0, filter_pos])
         activation = torch.sum(torch.abs(output[0, filter_pos]))
-        
+        print(activation.shape)
         # backprop
         activation.backward()
         
-        return self.output_grads.cpu().detach().numpy()
+        if self.model._endpoint == 'SOFTMAX':
+            return self.output_grads.cpu().detach().numpy(), output[0, filter_pos].data.cpu().numpy()
+        else:
+            return self.output_grads.cpu().detach().numpy(), None
     
     def compute_saliency(self, gradient):
         """

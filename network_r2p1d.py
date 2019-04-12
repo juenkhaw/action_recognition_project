@@ -291,16 +291,17 @@ class R2Plus1DNet(nn.Module):
             print('Post FC', x.shape)
         
         if self._endpoint == 'SOFTMAX':
+            print('SOFTMAX')
             return self.softmax(x)
         else:
             return x
 
-if __name__ is '__main__':
-    device = torch.device('cpu')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True).to(device)
-    
-    from torchsummary import summary
-    summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
+#if __name__ is '__main__':
+#    device = torch.device('cpu')
+#    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True).to(device)
+#    
+#    from torchsummary import summary
+#    summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
     
     #module.model_summary(model)
     #module.msra_init(model)

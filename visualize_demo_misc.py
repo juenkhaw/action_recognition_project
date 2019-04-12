@@ -11,7 +11,7 @@ import cv2
 
 from gbp_video_module import denormalize_buffer
 
-def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label):
+def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u', scores = None):
     """
     Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
     in vertical axis as temporal timeline
@@ -35,28 +35,44 @@ def plt_maps_vertical(args, test_frame, x_grads, pos_sal, neg_sal, label):
     row = args.frame_num
     
     fig = plt.figure(figsize = (col * 3, row * 3))
-    plt.title(label + ' (' + str(args.test_label + 1) + ')\n'
-              + str(row) + ' frames (' + args.test_video + ')\n',
+    plt.title(label + ' (' + str(args.test_label + 1) + ')' + 
+              ((' s = ' + str(scores)[:6]) if scores is not None else '') + 
+              '\n' + str(col - 1) + 
+              ((' ' + flow + '_') if args.modality == 'flow' else ' ') + 
+              args.modality + ' frames (' + args.test_video + ')\n',
               fontdict = {'fontsize' : 16}, loc = 'left')
     plt.axis('off')
     
     for i in range(0, test_frame.shape[2] * col):
         
-        img = contents[i % col][0, :, i // col].transpose((1, 2, 0))
-        img = denormalize_buffer(img)
+        if args.modality == 'rgb':
+            index = i // col
+        else:
+            if flow == 'u':
+                index = (i // col) * 2
+            else:
+                index = (i // col) * 2 + 1
+        
+        img = contents[i % col][0, :, index].transpose((1, 2, 0))
+        img = denormalize_buffer(img, option = 0 if (i % col) == 0 else 1)
+        if args.modality == 'flow':
+            img = img.reshape(img.shape[:2])
         
         ax = fig.add_subplot(row, col, i + 1)
         if i < 4:
             ax.set_title(titles[i % col])
         
         plt.axis('off')
-        plt.imshow(img)
+        if args.modality == 'flow' and (i % col) in [0, 1]:
+            plt.imshow(img, cmap = 'gray')
+        else:
+            plt.imshow(img)
         
     plt.subplots_adjust(hspace=0, wspace=0)
     
     return plt
 
-def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u'):
+def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u', scores = None):
     """
     Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
     in horizontal axis as temporal timeline
@@ -81,7 +97,9 @@ def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label, flow
     row = 4
     
     fig = plt.figure(figsize = (col * 3, row * 3))
-    plt.title(label + ' (' + str(args.test_label + 1) + ')\n' + str(col - 1) + 
+    plt.title(label + ' (' + str(args.test_label + 1) + ')' + 
+              ((' s = ' + str(scores)[:6]) if scores is not None else '') + 
+              '\n' + str(col - 1) + 
               ((' ' + flow + '_') if args.modality == 'flow' else ' ') + 
               args.modality + ' frames (' + args.test_video + ')\n',
               fontdict = {'fontsize' : 16}, loc = 'left')
@@ -102,7 +120,7 @@ def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label, flow
                         index = (j - 1) * 2 + 1
                 
                 img = contents[i][0, :, index].transpose((1, 2, 0))
-                img = denormalize_buffer(img)
+                img = denormalize_buffer(img, option = 0 if i == 0 else 1)
                 if args.modality == 'flow':
                     img = img.reshape(img.shape[:2])
             else:
@@ -124,7 +142,7 @@ def plt_maps_horizontal(args, test_frame, x_grads, pos_sal, neg_sal, label, flow
     
     return plt
 
-def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u'):
+def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u', scores = None):
     """
     Plot gradient maps, postive, and negative saliency maps that respective to each input frame 
     and shows it as an animation with its temporal timeline in a cv2 window
@@ -160,7 +178,8 @@ def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u'):
     output_frames *= 255
     
     # draw title
-    cv2.putText(output_frames, label + ' (' + str(args.test_label + 1) + ')', 
+    cv2.putText(output_frames, label + ' (' + str(args.test_label + 1) + ') ' + 
+                ((' s = ' + (str(scores)[:6])) if scores is not None else ''), 
                 (10, 20), cv2.FONT_HERSHEY_PLAIN, 1, (0, 0, 0), thickness = 1)
     cv2.putText(output_frames, str(args.frame_num) + 
                 ((' ' + flow + '_') if args.modality == 'flow' else ' ') +
@@ -192,7 +211,7 @@ def cv2_maps(args, test_frame, x_grads, pos_sal, neg_sal, label, flow = 'u'):
         for j in range(4):
             # transform contents to be visualizable
             img = contents[j][0, :, index].transpose((1, 2, 0))
-            img = cv2.resize(denormalize_buffer(img), (img_h, img_w))
+            img = cv2.resize(denormalize_buffer(img, option = 0 if j == 0 else 1), (img_h, img_w))
             
             if args.modality == 'rgb':
                 img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
