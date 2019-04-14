@@ -15,7 +15,7 @@ from network_r2p1d import R2Plus1DNet
 parser = argparse.ArgumentParser(description = 'fyp1 demo')
 parser.add_argument('test_video', help = 'video name to be visualized')
 parser.add_argument('test_label', help = 'label index for the testing video', type = int)
-
+parser.add_argument('-save', '--save', help = 'whether to store image', action = 'store_true', default = False)
 args = parser.parse_args()
 
 # define device
@@ -142,6 +142,9 @@ for i in range(4):
         cv2.putText(output, str(scores[i, predicted[i, j]])[:7], 
                     (out_w - 50, title_h + padding * i + graph_h * i + bar_h * (j + 1)), 
                     cv2.FONT_HERSHEY_PLAIN, 0.7, (0, 0, 0))
+        
+if args.save:
+    cv2.imwrite('demo_result/' + args.test_video + '.png', output)
 
 cv2.imshow('RESULT', output)
 cv2.waitKey(0)
