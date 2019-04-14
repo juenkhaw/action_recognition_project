@@ -150,3 +150,35 @@ cv2.imshow('RESULT', output)
 cv2.waitKey(0)
 
 cv2.destroyAllWindows()
+
+def show_videos(clip = 5):
+    img_h = int(112 * 1.3)
+    img_w = int(112 * 1.3)
+    padding = 10
+    out_h = padding * 2 + img_h
+    out_w = padding * 4 + img_w * 3
+    
+    output = np.ones((out_h, out_w, 3), np.uint8) * 255
+    
+    for i in range(8):
+        rgb_img = rgb_test_X[clip, :, i].cpu().numpy().transpose((1, 2, 0))
+        rgb_img = cv2.resize(denormalize_buffer(rgb_img), (img_h, img_w))
+        rgb_img = cv2.cvtColor(rgb_img, cv2.COLOR_RGB2BGR)
+        
+        u_flow_img = flow_test_X[clip, :, i * 2].cpu().numpy().transpose((1, 2, 0))
+        u_flow_img = cv2.resize(denormalize_buffer(u_flow_img), (img_h, img_w))
+        u_flow_img = np.expand_dims(u_flow_img, axis = 2)
+
+        v_flow_img = flow_test_X[clip, :, i * 2 + 1].cpu().numpy().transpose((1, 2, 0))
+        v_flow_img = cv2.resize(denormalize_buffer(v_flow_img), (img_h, img_w))
+        v_flow_img = np.expand_dims(v_flow_img, axis = 2)
+        
+        np.copyto(output[padding : padding + img_h, padding : padding + img_w, :], rgb_img)
+        np.copyto(output[padding : padding + img_h, img_w + padding * 2 : img_w * 2 + padding * 2, :], u_flow_img)
+        np.copyto(output[padding : padding + img_h, img_w * 2 + padding * 3 : out_w - padding, :], v_flow_img)
+    
+        cv2.imshow(args.test_video, output)
+        cv2.waitKey(0 if i == 0 else 1000)
+    
+    cv2.destroyAllWindows()
+    
