@@ -1,4 +1,4 @@
-# R(2+1)D Action Recognition Network
+# R(2+1)D Action Recognition Network with Weighted Fusion Network (Refactor Ongoing)
 
 ![Surfing_sample](https://github.com/juenkhaw/action_recognition_project/blob/master/demo_result/v_Surfing_g04_c01.png)
 
