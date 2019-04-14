@@ -1,4 +1,9 @@
 # R(2+1)D Action Recognition Network
+
+![Surfing_sample](https://github.com/juenkhaw/action_recognition_project/blob/master/demo_result/v_Surfing_g04_c01.png)
+
+![Walking with dog sample](https://github.com/juenkhaw/action_recognition_project/blob/master/demo_result/v_WalkingWithDog_g05_c05.png)
+
 ### Running
 
 Please run on `init.py` with one of the arguments set provided below:
