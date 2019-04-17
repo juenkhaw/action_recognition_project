@@ -129,8 +129,27 @@ def denormalize_buffer(buffer):
     
     return buffer
 
+def flow_mean_sub(buffer):
+    
+    # buffer sum of shape (clip_num, flow_dim, h, w, chnl)
+    sh = buffer.shape
+    buffer_sum = np.zeros((sh[0], 2, sh[2], sh[3], 1))
+    
+    # summation of flow, 0 -> u, 1 -> v
+    for l in range(sh[1]):
+        buffer_sum[:, l % 2] += buffer[:, l]
+    
+    # average
+    buffer_sum /= (sh[1] // 2)
+    
+    # substract the mean
+    for l in range(sh[1]):
+        buffer[:, l] -= buffer_sum[:, l % 2]
+        
+    return buffer
+
 def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, output_len, 
-               mode = 'clip', clips_per_video = 1):
+               mode = 'clip', mean_sub = True):
     """
     Reads original video frames/flows into memory and preprocesses them into training/testing input volume
     
@@ -155,9 +174,9 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
         assert(len(frames_path) == 2)
     assert(mode in ['clip', 'video'])
     if mode == 'clip':
-        assert(clips_per_video == 1)
+        clips_per_video = 1
     else:
-        assert(clips_per_video > 1)
+        clips_per_video = 10
     
     # read path content and sample frame
     path_content = []
@@ -240,6 +259,10 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             
             count += 1
     
+    # mean substraction
+    if mean_sub and modality == 'flow':
+        buffer = flow_mean_sub(buffer)
+    
     # normalize the video buffer
     buffer = normalize_buffer(buffer)
     
@@ -259,7 +282,7 @@ if __name__ == '__main__':
     #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
     video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
     video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'video', clips_per_video = 10)
+    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'video', mean_sub=True)
     buffer = buffer.transpose((0, 2, 3, 4, 1))
 #    buffer_chnl = buffer[:, :, :, :, 2]
 #    buffer[:, :, :, :, 2] = buffer[:, :, :, :, 0]

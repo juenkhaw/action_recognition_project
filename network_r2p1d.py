@@ -203,8 +203,7 @@ class R2Plus1DNet(nn.Module):
         'Conv3d_5_x',
         'AP',
         'FC',
-        'SCORES',
-        'SOFTMAX'
+        'SCORES'
     )
     
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
@@ -297,9 +296,9 @@ class R2Plus1DNet(nn.Module):
             print('Post FC', x.shape)
         
         if 'SOFTMAX' in self._endpoint:
-            final_out['SOFTMAX'] = self.softmax(x)
+            final_out['SCORES'] = self.softmax(x)
         else:
-            final_out['SCORES'] = x
+            final_out['FC'] = x
             
         return final_out
 
@@ -307,22 +306,6 @@ if __name__ is '__main__':
     device = torch.device('cuda:0')
     model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True, 
                         endpoint = ['AP', 'SCORES']).to(device)
-    
-    #from torchsummary import summary
-    #summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
-    
-    #module.model_summary(model)
-    #module.msra_init(model)
 
     x = torch.randn((1, 3, 8, 112, 112)).to(device)
     out = model(x)
-    
-#    try:
-#        model(x)
-#    except RuntimeError as e:
-#        pass
-#        if 'out of memory' in str(e):
-#            for p in model.parameters():
-#                if p.grad is not None:
-#                    del p.grad
-#            torch.cuda.empty_cache()
