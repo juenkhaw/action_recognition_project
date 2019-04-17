@@ -27,9 +27,8 @@ class VideoDataset(Dataset):
         clips_per_video : number of clips to be contained within one video
     """
     
-    def __init__(self, path, dataset, split, mode, modality, clip_len = 16, 
-                 test_mode = True, test_amt = 8, 
-                 load_mode = 'clip', clips_per_video = 1):
+    def __init__(self, path, dataset, split, mode, modality, clip_len = 8, 
+                 test_mode = True, test_amt = 8, mean_sub = False):
    
         # declare the parameters chosen as described in R(2+1)D papers
         self._resize_height = 128
@@ -38,10 +37,8 @@ class VideoDataset(Dataset):
         self._crop_width = 112
         self._mode = mode
         self._crop_depth = clip_len
-        self._load_mode = load_mode
-        self._clips_per_video = clips_per_video
-        
         self._modality = modality
+        self._mean_sub = mean_sub
         
         # validate the arguments
         assert(dataset in ['ucf', 'hmdb'])
@@ -49,13 +46,6 @@ class VideoDataset(Dataset):
         assert(mode in ['train', 'test'])
         assert(modality in ['rgb', 'flow'])
         # training should only be done on clips
-        if mode == 'train':
-            assert(load_mode == 'clip')
-        # clip mode should invovle only one clip per video
-        if load_mode == 'clip':
-            assert(clips_per_video == 1)
-        else:
-            assert(clips_per_video > 1)
             
         dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
         
@@ -116,8 +106,8 @@ class VideoDataset(Dataset):
         buffer = load_clips(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
                                          self._crop_height, self._crop_width, self._crop_depth, 
-                                         mode = self._load_mode, 
-                                         clips_per_video = self._clips_per_video)
+                                         mode = 'clip' if self._mode == 'train' else 'video', 
+                                         mean_sub = self._mean_sub)
         return buffer, self._labels[index]
     
     def __len__(self):
@@ -140,17 +130,14 @@ class TwoStreamDataset(Dataset):
         clips_per_video : number of clips to be contained within one video
     """
     
-    def __init__(self, path, dataset, split, mode, clip_len = 16, 
-                 test_mode = True, test_amt = 8, 
-                 load_mode = 'clip', clips_per_video = 1):
+    def __init__(self, path, dataset, split, mode, clip_len = 8, 
+                 test_mode = True, test_amt = 8, mean_sub = True):
         
         self._rgb_set = VideoDataset(path, dataset, split, mode, 'rgb', clip_len = clip_len, 
-                                     test_mode = test_mode, test_amt = test_amt, 
-                                     load_mode = load_mode, clips_per_video = clips_per_video)
+                                     test_mode = test_mode, test_amt = test_amt, mean_sub = False)
         
         self._flow_set = VideoDataset(path, dataset, split, mode, 'flow', clip_len = clip_len, 
-                                     test_mode = test_mode, test_amt = test_amt, 
-                                     load_mode = load_mode, clips_per_video = clips_per_video)
+                                     test_mode = test_mode, test_amt = test_amt, mean_sub = mean_sub)
         
     def __getitem__(self, index):
         # returning rgb, flow and labels at once
@@ -165,5 +152,5 @@ class TwoStreamDataset(Dataset):
     
 if __name__ == '__main__':
     train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = True, 
-                        test_amt = 8, load_mode = 'clip')
+                        test_amt = 8)
     trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)
