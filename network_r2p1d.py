@@ -295,7 +295,7 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Post FC', x.shape)
         
-        if 'SOFTMAX' in self._endpoint:
+        if 'SCORES' in self._endpoint:
             final_out['SCORES'] = self.softmax(x)
         else:
             final_out['FC'] = x

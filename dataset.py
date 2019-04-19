@@ -43,7 +43,7 @@ class VideoDataset(Dataset):
         # validate the arguments
         assert(dataset in ['ucf', 'hmdb'])
         assert(split in list(range(1, 4)))
-        assert(mode in ['train', 'test'])
+        assert(mode in ['train', 'test', 'validation'])
         assert(modality in ['rgb', 'flow'])
         # training should only be done on clips
             

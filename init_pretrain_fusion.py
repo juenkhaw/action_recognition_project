@@ -14,7 +14,6 @@ from torch.utils.data import DataLoader
 
 from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
-from test_net import test_stream
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Stream Network')
 
@@ -54,7 +53,7 @@ parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of l
 
 # parse arguments and print it out
 args = parser.parse_args()
-print('******* ARGUMENTS *******\n', args ,'\n*************************\n')
+print('******* ARGUMENTS *******', args ,'\n*************************\n')
 
 # SETTINGS OF DEVICES ========================================
 gpu_name = 'cuda:0'
@@ -166,7 +165,6 @@ try:
                   '\n***********************************')
             
         # testing
-        test_stream(args, device, model, test_dataloader)
     
 except Exception:
     print(traceback.format_exc())
