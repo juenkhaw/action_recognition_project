@@ -46,14 +46,60 @@ def generate_subbatches(sbs, *tensors):
     
     return subbatches if len(tensors) > 1 else subbatches[0]
 
-def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
+def save_training_model(args, key, save_content, **contents):
+    """
+    Save the model state after interval of running epochs
     
-    losses = {'train' : [], 'val': []}
-    accs = {'train': [], 'val' : []}
-    epoch = 0
+    Inputs:
+        args : Program arguments
+        save_content : Accumulated save content
+        contetns : New contents with key and values to be added into the save_content
+        
+    Returns:
+        None
+    """
+    
+    # create/update the current training contents
+    save_content[key] = contents   
+    
+    save_path = args.savename + '.pth.tar'
+    #print('Saving at epoch', epoch + 1)
+    torch.save(save_content, save_path)
+
+def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler = None, save_content = None):
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
-    start = time.time()
+    
+    assert(save_content is not None)
+    
+    # load the model state that is to be continued for training
+    if args.load_model is not None and args.train:
+        
+        content = torch.load(args.load_model)['train']
+        
+        print('\n********* LOADING STATE ***********', 
+              '\nModel Path =', args.load_model, '\nLast Epoch =', content['epoch'])
+        
+        assert(content['epoch'] < args.epoch)
+        
+        # load the state model into the network and other modules
+        model.load_state_dict(content['state_dict'])
+        optimizer.load_state_dict(content['opt_dict'])
+        scheduler.load_state_dict(content['sch_dict'])
+        epoch = content['epoch']
+        losses = content['losses']
+        accs = content['accuracy']
+        start = content['train_elapsed']
+        
+        del content
+        
+        print('************* LOADED **************')
+    
+    else:
+        losses = {'train' : [], 'val': []}
+        accs = {'train': [], 'val' : []}
+        epoch = 0
+        start = time.time()
     
     for epoch in range(epoch, args.epoch):
         
@@ -153,6 +199,20 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             print('Epoch %d | lr %.1E | TrainLoss %.4f | ValLoss %.4f | TrainAcc %.4f | ValAcc %.4f' % 
                   (epoch + 1, lr, losses['train'][epoch], losses['val'][epoch], 
                    accs['train'][epoch], accs['val'][epoch]))
+            
+        # time to save these poor guys
+        # dun wanna losing them again
+        if (epoch + 1) % args.save_interval == 0 and args.save:
+            
+            save_training_model(args, 'train', save_content,  
+                                    accuracy = accs,
+                                    losses = losses,
+                                    train_elapsed = time.time() - start,
+                                    state_dict = model.state_dict(),
+                                    opt_dict = optimizer.state_dict(),
+                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                    epoch = epoch + 1
+                                    )
             
     # display the time elapsed
     time_elapsed = time.time() - start

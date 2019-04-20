@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
 from test_net import test_stream
-from train_net import train_stream
+from train_net import train_stream, save_training_model
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Stream Network')
 
@@ -85,8 +85,8 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
                                 in_channels = in_channels[args.modality], verbose = args.verbose1, 
                                 bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC']).to(device)
 
-# read the model state if model path is defined
-if args.load_model is not None:
+# load the model state that is completed training
+if args.load_model is not None and not args.train:
         
     print('\n********* LOADING STATE ***********', 
           '\nModel Path =', args.load_model, '\nModel State =', args.model_name)
@@ -108,7 +108,7 @@ try:
     
     # applying parallelism into the model
     # assuming 4 GPUs scnario
-    if args.parallel and num_devices > 1 and ('cuda' in device.type):
+    if args.parallel  and ('cuda' in device.type):
         """
         nn.DataParallel(module, device_ids, output_device, dim)
         module : module to be parallelized
@@ -119,7 +119,7 @@ try:
         """
         
         # SETTINGS on working GPUs ===============================
-        model = nn.DataParallel(model, all_gpu, gpu_name)
+        model = nn.DataParallel(model, [int(i[len(i) - 1]) for i in all_gpu], gpu_name[len(gpu_name) - 1])
     
     # execute training
     if args.train:
@@ -128,7 +128,7 @@ try:
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr = 1e-2)
         # trying on dynamic scheduler
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 5, threshold = 1e-4, min_lr = 1e-6)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
         
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
@@ -148,8 +148,18 @@ try:
                   '\n***********************************')
             
         # train
-        train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler)
-    
+        losses, accs, train_elapsed = train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content)
+        
+        if args.save:
+            save_training_model(args, 'train', save_content,  
+                                    accuracy = accs,
+                                    losses = losses,
+                                    train_elapsed = train_elapsed,
+                                    state_dict = model.state_dict(),
+                                    opt_dict = optimizer.state_dict(),
+                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                    epoch = args.epoch
+                                    )
     # execute testing
     if args.test:
         
@@ -169,8 +179,14 @@ try:
                   '\n***********************************')
             
         # testing
-        test_stream(args, device, model, test_dataloader)
-    
+        all_scores, test_acc, test_elapsed = test_stream(args, device, model, test_dataloader)
+        
+        if args.save:
+            save_training_model(args, 'test', save_content, 
+                                    scores = all_scores,
+                                    accuracy = test_acc,
+                                    test_elapsed = test_elapsed
+                                    )
 except Exception:
     print(traceback.format_exc())
     

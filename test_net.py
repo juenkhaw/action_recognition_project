@@ -17,8 +17,8 @@ from train_net import generate_subbatches
 def test_stream(args, device, model, test_dataloader, mode = 'test'):
     
     all_scores = []
-    test_correct = [0, 0]
-    test_acc = [0, 0]
+    test_correct = {'top-1' : 0, 'top-5' : 0}
+    test_acc = {'top-1' : 0, 'top-5' : 0}
     
     batch = 1
     total_batch = int(ceil(len(test_dataloader.dataset) / test_dataloader.batch_size))
@@ -76,20 +76,20 @@ def test_stream(args, device, model, test_dataloader, mode = 'test'):
         top_k_indices = np.argsort(averaged_score, axis = 1)[:, ::-1][:, :5]
         
         # compute number of matches between predicted labels and true labels
-        test_correct[0] += np.sum(top_k_indices[:, 0] == np.array(labels).ravel())
-        test_correct[1] += np.sum(top_k_indices == np.array(labels))
+        test_correct['top-1'] += np.sum(top_k_indices[:, 0] == np.array(labels).ravel())
+        test_correct['top-5'] += np.sum(top_k_indices == np.array(labels))
     
     # compute accuracy over predictions on current batch
-    test_acc[0] = float(test_correct[0]) / len(test_dataloader.dataset)
-    test_acc[1] = float(test_correct[1]) / len(test_dataloader.dataset)
+    test_acc['top-1'] = float(test_correct['top-1']) / len(test_dataloader.dataset)
+    test_acc['top-5'] = float(test_correct['top-5']) / len(test_dataloader.dataset)
     
     # display the time elapsed in testing
     time_elapsed = time.time() - start
     if args.verbose2 and mode == 'test':
         print('\n\n+++++++++ TESTING RESULT +++++++++++',
               '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)),
-              '\nTop-1 Accuracy = %.4f' % (test_acc[0]),
-              '\nTop-5 Accuracy = %.4f' % (test_acc[1]),
+              '\nTop-1 Accuracy = %.4f' % (test_acc['top-1']),
+              '\nTop-5 Accuracy = %.4f' % (test_acc['top-5']),
               '\n++++++++++++++++++++++++++++++++++++')
     #print('\nTesting acc %.4f %.4f' % test_acc[0], test_acc[1])
     #print("Testing complete in %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
