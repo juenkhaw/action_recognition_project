@@ -28,8 +28,11 @@ def test_stream(args, device, model, test_dataloader, mode = 'test'):
     # put model into evaluation mode
     model.eval()
     
+    # we want softmax scores, not activations
+    model._endpoint = ['SCORES']
+    
     for inputs, labels in test_dataloader:
-        print('|-- Current batch =', str(batch), '/', str(total_batch), '--|', end = '\r')
+        print('Phase test | Current batch =', str(batch), '/', str(total_batch), end = '\r')
         batch += 1
         
         # getting dimensions of input

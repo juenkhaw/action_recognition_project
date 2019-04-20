@@ -6,6 +6,7 @@ Created on Fri Apr 19 15:42:57 2019
 """
 
 import time
+from math import ceil
 
 import torch
 
@@ -45,6 +46,121 @@ def generate_subbatches(sbs, *tensors):
     
     return subbatches if len(tensors) > 1 else subbatches[0]
 
-def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler = None, 
-                pretrained_content = None):
-    return    
+def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler = None):
+    
+    losses = {'train' : [], 'val': []}
+    accs = {'train': [], 'val' : []}
+    epoch = 0
+    
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
+    start = time.time()
+    
+    for epoch in range(epoch, args.epoch):
+        
+        for phase in ['train', 'val']:
+            
+            batch = 1
+            total_batch = int(ceil(len(dataloaders[phase].dataset) / args.batch_size))
+            
+            # reset the loss and accuracy
+            current_loss = 0
+            current_correct = 0
+            
+            # put the model into appropriate mode
+            if phase == 'train':
+                model.train()
+            else:
+                model.eval()
+                
+            # for each mini batch of dataset
+            for inputs, labels in dataloaders[phase]:
+                
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                batch += 1
+                
+                # place the input and label into memory of gatherer unit
+                inputs = inputs.to(device)
+                labels = labels.long().to(device)
+                optimizer.zero_grad()
+                
+                # format validation input volume
+                if phase == 'val':
+                    inputs = inputs.view(-1, inputs.shape[2], inputs.shape[3], 
+                             inputs.shape[4], inputs.shape[5])
+        
+                # partioning each batch into subbatches to fit into memory
+                sub_inputs, sub_labels = generate_subbatches(subbatch_sizes[phase], inputs, labels)
+            
+                # with enabling gradient descent on parameters during training phase
+                with torch.set_grad_enabled(phase == 'train'):
+                
+                    outputs = torch.tensor([], dtype = torch.float).to(device)
+                    sb = 0
+                
+                    for sb in range(len(sub_inputs)):
+                    
+                        output = model(sub_inputs[sb])
+                        
+                        if phase == 'train':
+                            # transforming outcome from a series of scores to a single scalar index
+                            # indicating the index where the highest score held
+                            _, preds = torch.max(output['FC'], 1)
+                            
+                            # compute the loss
+                            loss = criterion(output['FC'], sub_labels[sb])
+                            
+                            # accumulate gradients on parameters
+                            loss.backward()
+                            
+                            # accumulate loss and true positive for the current subbatch
+                            current_loss += loss.item() * sub_inputs[sb].size(0)
+                            current_correct += torch.sum(preds == sub_labels[sb].data)
+                            
+                        else:
+                            # append the validation result until all subbatches are tested on
+                            outputs = torch.cat((outputs, output['FC']))
+                        
+                    # avearging over validation results and compute val loss
+                    if phase == 'val':
+                        
+                        outputs = torch.mean(torch.reshape(outputs, (labels.shape[0], 10, -1)), dim = 1)
+                        current_loss += criterion(outputs, labels) * labels.shape[0]
+                        
+                        _, preds = torch.max(outputs, 1)
+                        current_correct += torch.sum(preds == labels.data)
+            
+                    # update parameters
+                    if phase == 'train':
+                        optimizer.step()
+            
+            # compute the loss and accuracy for the current batch
+            epoch_loss = current_loss / len(dataloaders['train'].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders['train'].dataset)
+            
+            losses[phase].append(epoch_loss)
+            accs[phase].append(epoch_acc)
+            
+            # get current learning rate
+            for param_group in optimizer.param_groups:
+                lr = param_group['lr']
+            
+            # step on reduceLRonPlateau with val acc
+            if scheduler is not None and phase == 'val':
+                scheduler.step(epoch_acc)
+            
+        if args.verbose2:
+            #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
+            print('Epoch %d | lr %.1E | TrainLoss %.4f | ValLoss %.4f | TrainAcc %.4f | ValAcc %.4f' % 
+                  (epoch + 1, lr, losses['train'][epoch], losses['val'][epoch], 
+                   accs['train'][epoch], accs['val'][epoch]))
+            
+    # display the time elapsed
+    time_elapsed = time.time() - start
+    if args.verbose2:
+        print('\n\n+++++++++ TRAINING RESULT +++++++++++',
+              '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
+              '\n+++++++++++++++++++++++++++++++++++++')
+    #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    #print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
+    
+    return losses, accs, time_elapsed

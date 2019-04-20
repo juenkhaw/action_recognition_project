@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
 from test_net import test_stream
+from train_net import train_stream
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Stream Network')
 
@@ -43,6 +44,7 @@ parser.add_argument('-parallel', '--parallel', help = 'activate to run on multip
 
 # testing settings
 parser.add_argument('-test', '--test', help = 'activate to evaluate the model', action = 'store_true', default = False)
+parser.add_argument('-tbs', '--test-batch-size', help = 'number of sample in each testing batch', default = 32, type = int)
 parser.add_argument('-stbs', '--sub-test-batch-size', help = 'number of clips in each testing sub-batch', default = 8, type = int)
 
 # output settings
@@ -81,7 +83,7 @@ save_content['args'] = args
 # define and intialize the network
 model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                                 in_channels = in_channels[args.modality], verbose = args.verbose1, 
-                                bn_momentum = 0.1, bn_epson = 1e-3).to(device)
+                                bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC']).to(device)
 
 # read the model state if model path is defined
 if args.load_model is not None:
@@ -126,7 +128,7 @@ try:
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.SGD(model.parameters(), lr = 1e-2)
         # trying on dynamic scheduler
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, min_lr = 1e-6)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 5, threshold = 1e-4, min_lr = 1e-6)
         
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
@@ -146,6 +148,7 @@ try:
                   '\n***********************************')
             
         # train
+        train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler)
     
     # execute testing
     if args.test:
@@ -159,7 +162,7 @@ try:
         test_dataloader = DataLoader(
                 VideoDataset(args.dataset_path, args.dataset, args.split, 'test', args.modality, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt),
-                batch_size = 32, shuffle = False)
+                batch_size = args.test_batch_size, shuffle = False)
                 
         if args.verbose2:
             print('Testing Set =', len(test_dataloader.dataset),
