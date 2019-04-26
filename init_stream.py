@@ -101,11 +101,7 @@ if args.load_model is not None and not args.train:
     print('************* LOADED **************')
     
 try:
-    if args.verbose2:
-        print('\n************ TRAINING *************', 
-              '\nDataset =', args.dataset, '\nModality =', args.modality,
-              '\nSplit =', args.split)
-    
+
     # applying parallelism into the model
     # assuming 4 GPUs scnario
     if args.parallel  and ('cuda' in device.type):
@@ -123,6 +119,11 @@ try:
     
     # execute training
     if args.train:
+        
+        if args.verbose2:
+            print('\n************ TRAINING *************', 
+                  '\nDataset =', args.dataset, '\nModality =', args.modality,
+                  '\nSplit =', args.split)
         
         # define criterion, optimizer and scheduler
         criterion = nn.CrossEntropyLoss()

@@ -251,6 +251,9 @@ class R2Plus1DNet(nn.Module):
         
         self.softmax = nn.Softmax(dim = 1)
         
+    def freeze(self, unfreeze = False):
+        for params in self.parameters():
+            params.requires_grad = unfreeze
 
     def replaceLinear(self, num_classes):
         """
@@ -294,11 +297,12 @@ class R2Plus1DNet(nn.Module):
         x = self.linear1(x)
         if self._verbose:
             print('Post FC', x.shape)
+            
+        if 'FC' in self._endpoint:
+            final_out['FC'] = x
         
         if 'SCORES' in self._endpoint:
             final_out['SCORES'] = self.softmax(x)
-        else:
-            final_out['FC'] = x
             
         return final_out
 

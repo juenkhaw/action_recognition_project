@@ -93,12 +93,26 @@ class VideoDataset(Dataset):
         
         # implement test mode to extremely scale down the dataset
         if test_mode:
-            #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
-            indices = list(range(test_amt))
-            self._clip_names = (np.array(self._clip_names))[indices]
-            self._labels = self._labels[indices]
-            #for i in range(test_amt):
-            #    print(self._clip_names[i], self._labels[i])
+#            #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
+#            indices = list(range(test_amt))
+#            self._clip_names = (np.array(self._clip_names))[indices]
+#            self._labels = self._labels[indices]
+#            #for i in range(test_amt):
+#            #    print(self._clip_names[i], self._labels[i])
+            
+            freqs = np.bincount(self._labels)
+            assert(test_amt <= np.min(freqs))
+            test_clip_names = [[] for i in range(len(freqs) * test_amt)]
+            test_labels = []
+            freq_sum = 0
+            for i in range(len(freqs)):
+                freq_sum += freqs[i]
+                for j in range(test_amt):
+                    test_clip_names[i * test_amt + j] = self._clip_names[freq_sum - freqs[i] + j]
+                    test_labels.append(self._labels[freq_sum - freqs[i] + j])
+            self._clip_names = test_clip_names
+            self._labels = np.array([label for label in test_labels], dtype = np.int)
+            
         
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
@@ -112,7 +126,7 @@ class VideoDataset(Dataset):
     
     def __len__(self):
         # ensure that the length of X is same with y
-        assert(len(self._clip_names) == len(self._labels))
+        #assert(len(self._clip_names) == len(self._labels))
         return len(self._labels)
     
 class TwoStreamDataset(Dataset):
