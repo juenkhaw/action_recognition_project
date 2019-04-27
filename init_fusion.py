@@ -22,7 +22,7 @@ parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 # mandatory settings
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
-parser.add_argument('fusion', help = 'Fusion method to be used', choices = ['average', 'modality-1-layer'])
+parser.add_argument('fusion', help = 'Fusion method to be used', choices = ['average', 'modality-1-layer', 'modality-3-layer'])
 parser.add_argument('archi', help = 'architecture used on complying streams and fusion networks', choices = ['pref', 'e2e'])
 
 # network and optimizer settings
@@ -33,15 +33,16 @@ parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', defaul
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
 parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
+parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction on flows', action = 'store_true', default = False)
 
 # model state loading settings
-parser.add_argument('-loadstream', '--load-stream', help = 'paths to the pretrained stream model state_dict (rgb, flow)', nargs = '+', default = [])
+parser.add_argument('-loadstream', '--load-stream', help = 'paths to the pretrained stream model state_dict (rgb, flow)', nargs = '+', default = [], type = str)
 parser.add_argument('-loadfusion', '--load-fusion', help = 'path to the pretrained fusion network model state_dict (pref : fusion network only, e2e : streams + fusion network)', 
-                    nargs = '+', default = [])
+                    nargs = '+', default = [], type = str)
 
 # debugging mode settings
-parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
-parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
+parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', default = 'none', choices = ['none', 'peek', 'distributed'])
+parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', nargs = '+', default = [2, 1, 1])
 
 # device and parallelism settings
 parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
@@ -71,6 +72,12 @@ if args.fusion == 'average':
     assert(args.archi == 'pref')
     assert(not args.train)
     assert(len(args.load_stream) == 2)
+    
+# arguments on debugging mode arguments
+if args.test_mode == 'peek':
+    assert(len(args.test_amt) == 1)
+elif args.test_mode == 'distributed':
+    assert(len(args.test_amt) == 3)
 
 # SETTINGS OF DEVICES ========================================
 gpu_name = 'cuda:0'
@@ -89,7 +96,7 @@ if args.verbose2:
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 1}
-stream_endp = {'average' : ['SCORES'], 'modality-1-layer' : ['AP', 'FC']}
+stream_endp = {'average' : ['SCORES'], 'modality-1-layer' : ['AP', 'FC'], 'modality-3-layer' : ['AP', 'FC']}
 
 # intialize save content
 save_content = {}
@@ -193,13 +200,13 @@ try:
             
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
-                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'train', 
+                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'train', mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                 batch_size = args.batch_size, shuffle = True)
         val_dataloader = DataLoader(
-                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'validation', 
+                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'validation', mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
-                batch_size = args.batch_size, shuffle = False)
+                batch_size = args.test_batch_size, shuffle = False)
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
         
@@ -243,7 +250,7 @@ try:
         
         # preparing testing dataset
         test_dataloader = DataLoader(
-                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'test',
+                TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'test', mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt),
                 batch_size = args.test_batch_size, shuffle = False)
                 

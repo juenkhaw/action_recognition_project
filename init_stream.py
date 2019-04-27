@@ -19,24 +19,27 @@ from train_net import train_stream, save_training_model
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Stream Network')
 
-# training settings
+# mandatory settings
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('modality', help = 'modality to be trained and validated', choices = ['rgb', 'flow', '2-stream'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
+
+# network and optimizer settings
+parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
 parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 8, type = int)
 parser.add_argument('-sp', '--split', help = 'dataset split selected in training and evaluating model', default = 1, choices = list(range(1, 4)), type = int)
 parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
 parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
+parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction on flows', action = 'store_true', default = False)
 
-parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
+# model state loading settings
 parser.add_argument('-loadmodel', '--load-model', help = 'path to the pretrained model state_dict', default = None, type = str)
-parser.add_argument('-modelname', '--model-name', help = 'path to the model state_dict in the model package', default = None, type = str)
 
 # debugging mode settings
-parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', action = 'store_true', default = False)
-parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', default = 2, type = int)
+parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', default = 'none', choices = ['none', 'peek', 'distributed'])
+parser.add_argument('-tc', '--test-amt', help = 'number of labelled samples to be left when test mode is activated', nargs = '+', default = [2, 1, 1])
 
 # device and parallelism settings
 parser.add_argument('-dv', '--device', help = 'device chosen to perform training', default = 'gpu', choices = ['gpu', 'cpu'])
@@ -57,6 +60,8 @@ parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of l
 # parse arguments and print it out
 args = parser.parse_args()
 print('******* ARGUMENTS *******\n', args ,'\n*************************\n')
+
+assert(args.train or args.test)
 
 # SETTINGS OF DEVICES ========================================
 gpu_name = 'cuda:0'
@@ -86,17 +91,19 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
                                 bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC']).to(device)
 
 # load the model state that is completed training
-if args.load_model is not None and not args.train:
+if args.load_model is not [] and not args.train:
         
     print('\n********* LOADING STATE ***********', 
-          '\nModel Path =', args.load_model, '\nModel State =', args.model_name)
+          '\nModel Path =', args.load_model)
     
-    assert(args.model_name is not None)
-    model_state = torch.load(args.load_model)[args.modality][args.model_name]['state_dict']
+    assert(len(args.load_model) == 1)
+    
+    model_state = torch.load(args.load_model)['train']['state_dict']
     
     # load the state model into the network
     model.load_state_dict(model_state)
     del model_state
+    torch.cuda.empty_cache()
     
     print('************* LOADED **************')
     
@@ -133,13 +140,13 @@ try:
         
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
-                VideoDataset(args.dataset_path, args.dataset, args.split, 'train', args.modality, 
+                VideoDataset(args.dataset_path, args.dataset, args.split, 'train', args.modality, mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
                 batch_size = args.batch_size, shuffle = True)
         val_dataloader = DataLoader(
-                VideoDataset(args.dataset_path, args.dataset, args.split, 'validation', args.modality, 
+                VideoDataset(args.dataset_path, args.dataset, args.split, 'validation', args.modality, mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
-                batch_size = args.batch_size, shuffle = False)
+                batch_size = args.test_batch_size, shuffle = False)
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
         
@@ -171,7 +178,7 @@ try:
         
         # preparing testing dataset
         test_dataloader = DataLoader(
-                VideoDataset(args.dataset_path, args.dataset, args.split, 'test', args.modality, 
+                VideoDataset(args.dataset_path, args.dataset, args.split, 'test', args.modality, mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt),
                 batch_size = args.test_batch_size, shuffle = False)
                 

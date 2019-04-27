@@ -48,6 +48,7 @@ class VideoDataset(Dataset):
         # training should only be done on clips
             
         dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
+        _test_amt = {'train' : 0, 'test' : 2, 'validation' : 1}
         
         # ************CRUCIAL DATASET DIRECTORY*******************
         main_dir = path
@@ -92,23 +93,26 @@ class VideoDataset(Dataset):
         self._labels = np.array([label for label in labels], dtype = np.int)
         
         # implement test mode to extremely scale down the dataset
-        if test_mode:
-#            #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
-#            indices = list(range(test_amt))
-#            self._clip_names = (np.array(self._clip_names))[indices]
-#            self._labels = self._labels[indices]
+        if test_mode == 'peek':
+            #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
+            indices = list(range(int(test_amt[0])))
+            self._clip_names = (np.array(self._clip_names))[indices]
+            self._labels = self._labels[indices]
 #            #for i in range(test_amt):
 #            #    print(self._clip_names[i], self._labels[i])
             
+        elif test_mode == 'distributed':
+            
+            _amt = int(test_amt[_test_amt[mode]])
             freqs = np.bincount(self._labels)
-            assert(test_amt <= np.min(freqs))
-            test_clip_names = [[] for i in range(len(freqs) * test_amt)]
+            assert(_amt <= np.min(freqs))
+            test_clip_names = [[] for i in range(len(freqs) * _amt)]
             test_labels = []
             freq_sum = 0
             for i in range(len(freqs)):
                 freq_sum += freqs[i]
-                for j in range(test_amt):
-                    test_clip_names[i * test_amt + j] = self._clip_names[freq_sum - freqs[i] + j]
+                for j in range(_amt):
+                    test_clip_names[i * _amt + j] = self._clip_names[freq_sum - freqs[i] + j]
                     test_labels.append(self._labels[freq_sum - freqs[i] + j])
             self._clip_names = test_clip_names
             self._labels = np.array([label for label in test_labels], dtype = np.int)
@@ -145,7 +149,7 @@ class TwoStreamDataset(Dataset):
     """
     
     def __init__(self, path, dataset, split, mode, clip_len = 8, 
-                 test_mode = True, test_amt = 8, mean_sub = True):
+                 test_mode = 'distributed', test_amt = 8, mean_sub = True):
         
         self._rgb_set = VideoDataset(path, dataset, split, mode, 'rgb', clip_len = clip_len, 
                                      test_mode = test_mode, test_amt = test_amt, mean_sub = False)
@@ -165,6 +169,6 @@ class TwoStreamDataset(Dataset):
         return self._rgb_set.__len__()
     
 if __name__ == '__main__':
-    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = True, 
+    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = 'distributed', 
                         test_amt = 8)
     trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)

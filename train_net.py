@@ -7,8 +7,14 @@ Created on Fri Apr 19 15:42:57 2019
 
 import time
 from math import ceil
+import gc
 
 import torch
+
+def memReport():
+    for obj in gc.get_objects():
+        if torch.is_tensor(obj):
+            print(type(obj), obj.size())
 
 def generate_subbatches(sbs, *tensors):
     """
@@ -64,12 +70,11 @@ def save_training_model(args, key, save_content, **contents):
     #print('Saving at epoch', epoch + 1)
     torch.save(save_content, save_path)
 
-def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler = None, save_content = None):
+def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content):
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
-    
-    assert(save_content is not None)
-    
+    subbatch_count = {'train' : args.batch_size, 'val' : args.test_batch_size}
+        
     # load the model state that is to be continued for training
     if args.load_model is not None and args.train:
         
@@ -87,9 +92,11 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         epoch = content['epoch']
         losses = content['losses']
         accs = content['accuracy']
-        start = content['train_elapsed']
+        start = time.time()
+        prev_elapsed = content['train_elapsed']
         
         del content
+        torch.cuda.empty_cache()
         
         print('************* LOADED **************')
     
@@ -98,13 +105,14 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         accs = {'train': [], 'val' : []}
         epoch = 0
         start = time.time()
+        prev_elapsed = 0
     
     for epoch in range(epoch, args.epoch):
         
         for phase in ['train', 'val']:
             
             batch = 1
-            total_batch = int(ceil(len(dataloaders[phase].dataset) / args.batch_size))
+            total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
             
             # reset the loss and accuracy
             current_loss = 0
@@ -134,6 +142,9 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         
                 # partioning each batch into subbatches to fit into memory
                 sub_inputs, sub_labels = generate_subbatches(subbatch_sizes[phase], inputs, labels)
+                
+                del inputs
+                torch.cuda.empty_cache()
             
                 # with enabling gradient descent on parameters during training phase
                 with torch.set_grad_enabled(phase == 'train'):
@@ -213,7 +224,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                                     )
             
     # display the time elapsed
-    time_elapsed = time.time() - start
+    time_elapsed = time.time() - start + prev_elapsed
     if args.verbose2:
         print('\n\n+++++++++ TRAINING RESULT +++++++++++',
               '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
@@ -226,11 +237,13 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
 def train_pretrained_stream(args, device, models, dataloaders, optimizer, criterion, scheduler, save_content):
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.test_batch_size}
     
     losses = {'train' : [], 'val': []}
     accs = {'train' : [], 'val': []}
     epoch = 0
     start = time.time()
+    prev_elapsed = 0
     
     # LOAD INTERMEDIATE STATE
     if args.load_stream is not [] or args.load_fusion is not []:
@@ -250,6 +263,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
         
         del rgb_state
         del flow_state
+        torch.cuda.empty_cache()
         
         # load intermediate state of fusion network if there is
         if args.load_fusion != []:
@@ -265,8 +279,11 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
             losses = fusion_state['losses']
             accs = fusion_state['accuracy']
             start = fusion_state['train_elapsed']
+            start = time.time()
+            prev_elapsed = fusion_state['train_elapsed']
             
             del fusion_state
+            torch.cuda.empty_cache()
             
         print('************* LOADED **************')
     
@@ -284,7 +301,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
         for phase in ['train', 'val']:
             
             batch = 1
-            total_batch = int(ceil(len(dataloaders[phase].dataset) / args.batch_size))
+            total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
             
             # reset the loss and accuracy
             current_loss = 0
@@ -317,6 +334,10 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                 sub_rgbX, sub_flowX, sub_labels = generate_subbatches(subbatch_sizes[phase], rgbX, flowX, labels)
                 assert(len(sub_rgbX) == len(sub_flowX))
                 
+                del rgbX
+                del flowX
+                torch.cuda.empty_cache()
+                
                 # clear out the gradient in parameters
                 optimizer.zero_grad()
                 
@@ -326,6 +347,8 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                     sb = 0
                     
                     for sb in range(len(sub_rgbX)):
+                        
+                        torch.cuda.empty_cache()
                         
                         rgb_out = models['rgb'](sub_rgbX[sb])
                         flow_out = models['flow'](sub_flowX[sb])
@@ -354,7 +377,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                 if phase == 'val':
                     
                     outputs = torch.mean(torch.reshape(outputs, (labels.shape[0], 10, -1)), dim = 1)
-                    current_loss += criterion(outputs, labels) * labels.shape[0]
+                    current_loss += criterion(outputs, labels).item() * labels.shape[0]
                         
                     _, preds = torch.max(outputs, 1)
                     current_correct += torch.sum(preds == labels.data)
@@ -385,7 +408,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                    accs['train'][epoch], accs['val'][epoch]))
             
     # display the time elapsed
-    time_elapsed = time.time() - start
+    time_elapsed = time.time() - start + prev_elapsed
     if args.verbose2:
         print('\n\n+++++++++ TRAINING RESULT +++++++++++',
               '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
