@@ -26,6 +26,13 @@ def temporal_crop(buffer_len, clip_len):
     
     return start_index, end_index
 
+def temporal_center_crop(buffer_len, clip_len):
+    
+    start_index = (buffer_len - clip_len) // 2
+    end_index = start_index + clip_len
+    
+    return start_index, end_index
+
 def temporal_uniform_crop(buffer_len, clip_len, clips_per_video):
     """
     Uniformly crops the video into N clips over temporal dimension
@@ -125,11 +132,18 @@ def denormalize_buffer(buffer):
         buffer : np array of unnormalized frames
     """
     
-    buffer = ((buffer - buffer.min()) / (buffer.max() - buffer.min()) * 255).astype(np.uint8)
+    buffer = (buffer * 128 + 128).astype(np.uint8)
     
     return buffer
 
 def flow_mean_sub(buffer):
+    
+    clip = False
+    
+    # extend the dimension if buffer is a clip
+    if len(buffer.shape) == 4:
+        buffer = np.expand_dims(buffer, 0)
+        clip = True
     
     # buffer sum of shape (clip_num, flow_dim, h, w, chnl)
     sh = buffer.shape
@@ -145,11 +159,17 @@ def flow_mean_sub(buffer):
     # substract the mean
     for l in range(sh[1]):
         buffer[:, l] -= buffer_sum[:, l % 2]
+        # scale up to between [0, 255]
+        buffer[:, l] += np.abs(np.min(buffer[:, l]))
+        buffer[:, l] = buffer[:, l] / np.max(buffer[:, l]) * 255
+        
+    if clip:
+        buffer = buffer.view(sh[1:])
         
     return buffer
 
 def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, output_len, 
-               mode = 'clip', mean_sub = True):
+               mode, mean_sub = True):
     """
     Reads original video frames/flows into memory and preprocesses them into training/testing input volume
     
@@ -172,8 +192,8 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
         assert(len(frames_path) == 1)
     else:
         assert(len(frames_path) == 2)
-    assert(mode in ['clip', 'video'])
-    if mode == 'clip':
+    assert(mode in ['train', 'validation', 'test'])
+    if mode in ['train', 'validation']:
         clips_per_video = 1
     else:
         clips_per_video = 10
@@ -193,11 +213,16 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     else:
         frame_chn = 1 #2
     
-    if mode == 'clip':
+    if mode in ['train', 'validation']:
         t_index = []
         # retrieve indices for random cropping
-        t_index.append(temporal_crop(frame_count, output_len))
-        s_index = spatial_crop((scale_h, scale_w), (output_h, output_w))
+        if mode == 'train':
+            t_index.append(temporal_crop(frame_count, output_len))
+            s_index = spatial_crop((scale_h, scale_w), (output_h, output_w))
+            
+        else:
+            t_index.append(temporal_center_crop(frame_count, output_len))
+            s_index = spatial_center_crop((scale_h, scale_w), (output_h, output_w))
         #buffer = np.empty((output_len, output_h, output_w, frame_chn), np.float32)
     else:
         # retrieve indices for center cropping and temporal index for each clips
@@ -269,25 +294,33 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     # convert array format to cope with Pytorch
     # [chnl, depth, h, w] for clips
     # [clip, chnl, depth, h, w] for video
-    if mode == 'clip':
+    if mode in ['train', 'validation']:
         buffer = buffer[0, :, :, :, :]
         buffer = buffer.transpose((3, 0, 1 ,2))
     else:
         buffer = buffer.transpose((0, 4, 1, 2, 3))
         
     return buffer
+
+def transpose_video_buffer(buffer):
+    return buffer.transpose((0, 2, 3, 4, 1))
+
+def transpose_clip_buffer(buffer):
+    return buffer.transpose((1, 2, 3, 0))
             
     
 if __name__ == '__main__':
-    #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
-    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
-    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'video', mean_sub=True)
-    buffer = buffer.transpose((0, 2, 3, 4, 1))
-#    buffer_chnl = buffer[:, :, :, :, 2]
-#    buffer[:, :, :, :, 2] = buffer[:, :, :, :, 0]
-#    buffer[:, :, :, :, 0] = buffer_chnl
-#    cv2.imshow('buffer0', buffer[6, 0, :, :, :])
-#    cv2.imshow('buffer1', buffer[6, 1, :, :, :])
-#    cv2.waitKey(0)
+    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
+    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
+    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
+    #buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'val', mean_sub=True)
+    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
+    #buffer = transpose_video_buffer(buffer)
+    buffer = transpose_clip_buffer(buffer)
+    buffer0 = buffer[0, :, :, :]
+    #buffer1 = buffer[1, :, :, :]
+    #buffer0 = cv2.cvtColor(buffer0, cv2.COLOR_RGB2BGR)
+    cv2.imshow('buffer0', buffer0)
+    #cv2.imshow('buffer1', buffer1)
+    cv2.waitKey(0)
     cv2.destroyAllWindows()

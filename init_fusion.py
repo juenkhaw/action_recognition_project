@@ -22,7 +22,8 @@ parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 # mandatory settings
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
-parser.add_argument('fusion', help = 'Fusion method to be used', choices = ['average', 'modality-1-layer', 'modality-3-layer'])
+parser.add_argument('fusion', help = 'Fusion method to be used', 
+                    choices = ['average', 'modality-3-layer', 'feature-3-layer', 'modality-3-layer-PREAP'])
 parser.add_argument('archi', help = 'architecture used on complying streams and fusion networks', choices = ['pref', 'e2e'])
 
 # network and optimizer settings
@@ -83,7 +84,7 @@ elif args.test_mode == 'distributed':
 gpu_name = 'cuda:0'
 all_gpu = ['cuda:0']
 device = torch.device(gpu_name if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
-num_devices = torch.cuda.device_count() 
+num_devices = torch.cuda.device_count()
 
 # printing device info
 if args.verbose2:
@@ -96,7 +97,10 @@ if args.verbose2:
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 1}
-stream_endp = {'average' : ['SCORES'], 'modality-1-layer' : ['AP', 'FC'], 'modality-3-layer' : ['AP', 'FC']}
+stream_endp = {'average' : ['SCORES'], 
+               'feature-3-layer' : ['AP', 'FC'], 
+               'modality-3-layer' : ['AP', 'FC'], 
+               'modality-3-layer-PREAP' : ['Conv3d_5_x', 'FC']}
 
 # intialize save content
 save_content = {}
@@ -195,8 +199,9 @@ try:
             flow_scheduler = optim.lr_scheduler.ReduceLROnPlateau(flow_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
         
         if args.fusion is not 'average':
+            #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
             fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2)
-            fusion_scheduler = optim.lr_scheduler.ReduceLROnPlateau(fusion_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
+            fusion_scheduler = optim.lr_scheduler.ReduceLROnPlateau(fusion_optimizer, patience = 5, threshold = 1e-4, min_lr = 1e-7)
             
         # preparing the training and validation dataset
         train_dataloader = DataLoader(

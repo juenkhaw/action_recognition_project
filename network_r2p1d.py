@@ -282,7 +282,7 @@ class R2Plus1DNet(nn.Module):
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
             if self.VALID_ENDPOINTS[i] in self._endpoint:
-                final_out[self.VALID_ENDPOINTS] = x
+                final_out[self.VALID_ENDPOINTS[i]] = x
         
         # pre-fc
         x = self.avgpool(x)
@@ -309,7 +309,7 @@ class R2Plus1DNet(nn.Module):
 if __name__ is '__main__':
     device = torch.device('cuda:0')
     model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True, 
-                        endpoint = ['AP', 'SCORES']).to(device)
+                        endpoint = ['Conv3d_5_x', 'SCORES']).to(device)
 
     x = torch.randn((1, 3, 8, 112, 112)).to(device)
     out = model(x)

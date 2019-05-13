@@ -28,7 +28,7 @@ class VideoDataset(Dataset):
     """
     
     def __init__(self, path, dataset, split, mode, modality, clip_len = 8, 
-                 test_mode = True, test_amt = 8, mean_sub = False):
+                 test_mode = True, test_amt = [8], mean_sub = False):
    
         # declare the parameters chosen as described in R(2+1)D papers
         self._resize_height = 128
@@ -124,7 +124,7 @@ class VideoDataset(Dataset):
         buffer = load_clips(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
                                          self._crop_height, self._crop_width, self._crop_depth, 
-                                         mode = 'clip' if self._mode == 'train' else 'video', 
+                                         mode = self._mode, 
                                          mean_sub = self._mean_sub)
         return buffer, self._labels[index]
     
@@ -170,5 +170,5 @@ class TwoStreamDataset(Dataset):
     
 if __name__ == '__main__':
     train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = 'distributed', 
-                        test_amt = 8)
+                        test_amt = [2, 1, 0])
     trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)

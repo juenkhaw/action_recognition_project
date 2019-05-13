@@ -315,7 +315,8 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
             # for each mini batch of dataset
             for rgbX, flowX, labels in dataloaders[phase]:
                 
-                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
                 batch += 1
                 
                 # place the input and label into memory of gatherer unit
@@ -323,12 +324,12 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                 flowX = flowX.to(device)
                 labels = labels.long().to(device)
                 
-                # format validation input volume
-                if phase == 'val':
-                    rgbX = rgbX.view(-1, rgbX.shape[2], rgbX.shape[3], 
-                             rgbX.shape[4], rgbX.shape[5])
-                    flowX = flowX.view(-1, flowX.shape[2], flowX.shape[3], 
-                             flowX.shape[4], flowX.shape[5])
+#                # format validation input volume
+#                if phase == 'val':
+#                    rgbX = rgbX.view(-1, rgbX.shape[2], rgbX.shape[3], 
+#                             rgbX.shape[4], rgbX.shape[5])
+#                    flowX = flowX.view(-1, flowX.shape[2], flowX.shape[3], 
+#                             flowX.shape[4], flowX.shape[5])
                     
                 # partioning each batch into subbatches to fit into memory
                 sub_rgbX, sub_flowX, sub_labels = generate_subbatches(subbatch_sizes[phase], rgbX, flowX, labels)
@@ -376,7 +377,6 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
                 # avearging over validation results and compute val loss
                 if phase == 'val':
                     
-                    outputs = torch.mean(torch.reshape(outputs, (labels.shape[0], 10, -1)), dim = 1)
                     current_loss += criterion(outputs, labels).item() * labels.shape[0]
                         
                     _, preds = torch.max(outputs, 1)
