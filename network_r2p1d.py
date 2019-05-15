@@ -196,11 +196,11 @@ class R2Plus1DNet(nn.Module):
     """
     
     VALID_ENDPOINTS = (
-        'Conv3d_1',
-        'Conv3d_2_x',
-        'Conv3d_3_x',
-        'Conv3d_4_x',
-        'Conv3d_5_x',
+        'conv1',
+        'conv2_x',
+        'conv3_x',
+        'conv4_x',
+        'conv5_x',
         'AP',
         'FC',
         'SCORES'
@@ -251,9 +251,18 @@ class R2Plus1DNet(nn.Module):
         
         self.softmax = nn.Softmax(dim = 1)
         
-    def freeze(self, unfreeze = False):
+    def freezeAll(self, unfreeze = False):
         for params in self.parameters():
             params.requires_grad = unfreeze
+            
+    def freeze(self, layer, unfreeze = False):
+        assert(layer in self.VALID_ENDPOINTS[:5])
+        freeze_layer = int(layer.split('_')[0][-1])
+        
+        for i, modul in enumerate(self.net):
+            for params in modul.parameters():
+                params.requires_grad = unfreeze if i < freeze_layer else not unfreeze
+        
 
     def replaceLinear(self, num_classes):
         """
@@ -277,7 +286,7 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Input', x.shape)
             
-        for i, module in enumerate(self.net):
+        for i, modul in enumerate(self.net):
             x = self.net[i](x)
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
@@ -308,8 +317,8 @@ class R2Plus1DNet(nn.Module):
 
 if __name__ is '__main__':
     device = torch.device('cuda:0')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True, 
-                        endpoint = ['Conv3d_5_x', 'SCORES']).to(device)
+    model = R2Plus1DNet(layer_sizes = [3, 4, 6, 3], num_classes = 101, device = device, in_channels = 3, verbose = True, 
+                        endpoint = ['conv5_x', 'SCORES']).to(device)
 
-    x = torch.randn((1, 3, 8, 112, 112)).to(device)
-    out = model(x)
+    #x = torch.randn((1, 3, 8, 112, 112)).to(device)
+    #out = model(x)

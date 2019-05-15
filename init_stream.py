@@ -31,10 +31,12 @@ parser.add_argument('-sp', '--split', help = 'dataset split selected in training
 parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
-parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
+parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each training sub-batch', default = 8, type = int)
+parser.add_argument('-vsbs', '--val-subbatch-size', help = 'number of labelled sample for each validation sub-batch', default = 8, type = int)
 parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction on flows', action = 'store_true', default = False)
 
 # model state loading settings
+parser.add_argument('-pretrain', '--pretrain', help = 'indicating whether using pretrained model to train', action = 'store_true', default = False)
 parser.add_argument('-loadmodel', '--load-model', help = 'path to the pretrained model state_dict', default = None, type = str)
 
 # debugging mode settings
@@ -62,6 +64,8 @@ args = parser.parse_args()
 print('******* ARGUMENTS *******\n', args ,'\n*************************\n')
 
 assert(args.train or args.test)
+if args.pretrain:
+    assert(args.load_model is not None)
 
 # SETTINGS OF DEVICES ========================================
 gpu_name = 'cuda:0'
@@ -91,19 +95,21 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
                                 bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC']).to(device)
 
 # load the model state that is completed training
-if args.load_model is not [] and not args.train:
+if args.load_model is not None or args.pretrain:
         
     print('\n********* LOADING STATE ***********', 
           '\nModel Path =', args.load_model)
     
-    assert(len(args.load_model) == 1)
-    
     model_state = torch.load(args.load_model)['train']['state_dict']
     
     # load the state model into the network
-    model.load_state_dict(model_state)
+    model.load_state_dict(model_state, strict = False)
     del model_state
     torch.cuda.empty_cache()
+    
+    # freeze part of the model if it is a pretrained model
+    if args.pretrain:
+        model.freeze('conv5_x')
     
     print('************* LOADED **************')
     
@@ -146,7 +152,7 @@ try:
         val_dataloader = DataLoader(
                 VideoDataset(args.dataset_path, args.dataset, args.split, 'validation', args.modality, mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
-                batch_size = args.test_batch_size, shuffle = False)
+                batch_size = args.val_subbatch_size, shuffle = False)
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
         

@@ -59,9 +59,9 @@ for p in keys:
         record = True
         # if it is the spatial conv
         if 'middle' in p:
-            pname = 'net.conv1.spatial_conv.conv_spatial_'
+            pname = 'net.conv1.spatial_conv.conv.spatial_'
         else: # else temporal conv
-            pname = 'net.conv1.temporal_conv.conv.conv_temporal_'
+            pname = 'net.conv1.temporal_conv.conv.temporal_'
             
         # if it is a bn layer
         if 'spatbn' in p:

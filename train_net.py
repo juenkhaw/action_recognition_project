@@ -72,11 +72,11 @@ def save_training_model(args, key, save_content, **contents):
 
 def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content):
     
-    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
-    subbatch_count = {'train' : args.batch_size, 'val' : args.test_batch_size}
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
         
     # load the model state that is to be continued for training
-    if args.load_model is not None and args.train:
+    if args.load_model is not None and not args.pretrain:
         
         content = torch.load(args.load_model)['train']
         
@@ -127,21 +127,21 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             # for each mini batch of dataset
             for inputs, labels in dataloaders[phase]:
                 
-                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
                 batch += 1
                 
                 # place the input and label into memory of gatherer unit
                 inputs = inputs.to(device)
                 labels = labels.long().to(device)
                 optimizer.zero_grad()
-                
-                # format validation input volume
-                if phase == 'val':
-                    inputs = inputs.view(-1, inputs.shape[2], inputs.shape[3], 
-                             inputs.shape[4], inputs.shape[5])
         
                 # partioning each batch into subbatches to fit into memory
-                sub_inputs, sub_labels = generate_subbatches(subbatch_sizes[phase], inputs, labels)
+                if phase == 'train':
+                    sub_inputs, sub_labels = generate_subbatches(subbatch_sizes[phase], inputs, labels)
+                else:
+                    sub_inputs = [inputs]
+                    sub_labels = [labels]
                 
                 del inputs
                 torch.cuda.empty_cache()
@@ -178,7 +178,6 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     # avearging over validation results and compute val loss
                     if phase == 'val':
                         
-                        outputs = torch.mean(torch.reshape(outputs, (labels.shape[0], 10, -1)), dim = 1)
                         current_loss += criterion(outputs, labels) * labels.shape[0]
                         
                         _, preds = torch.max(outputs, 1)
@@ -246,7 +245,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
     prev_elapsed = 0
     
     # LOAD INTERMEDIATE STATE
-    if args.load_stream is not [] or args.load_fusion is not []:
+    if (args.load_stream is not [] or args.load_fusion is not []) and not args.pretrain:
         
         print('\n********* LOADING STATE ***********', 
           '\nFusion Mode =', 'End to End' if args.archi == 'e2e' else 'Pretrained Streams'
@@ -288,8 +287,8 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
         print('************* LOADED **************')
     
     # freeze the streams for all the time
-    models['rgb'].freeze()
-    models['flow'].freeze()
+    models['rgb'].freezeAll()
+    models['flow'].freezeAll()
     models['rgb'].eval()
     models['flow'].eval()
     

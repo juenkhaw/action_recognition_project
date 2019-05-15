@@ -100,7 +100,7 @@ in_channels = {'rgb' : 3, 'flow' : 1}
 stream_endp = {'average' : ['SCORES'], 
                'feature-3-layer' : ['AP', 'FC'], 
                'modality-3-layer' : ['AP', 'FC'], 
-               'modality-3-layer-PREAP' : ['Conv3d_5_x', 'FC']}
+               'modality-3-layer-PREAP' : ['conv5_x', 'FC']}
 
 # intialize save content
 save_content = {}

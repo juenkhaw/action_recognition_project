@@ -133,8 +133,8 @@ class FusionNet(nn.Module):
                     
             elif self._fusion == 'modality-3-layer-PREAP':
                 
-                rgb_acv = self.relu(self.rgb_conv1(x_rgb['Conv3d_5_x'])).view(-1, 1024)
-                flow_acv = self.relu(self.flow_conv1(x_flow['Conv3d_5_x'])).view(-1, 1024)
+                rgb_acv = self.relu(self.rgb_conv1(x_rgb['conv5_x'])).view(-1, 1024)
+                flow_acv = self.relu(self.flow_conv1(x_flow['conv5_x'])).view(-1, 1024)
                 
 #                rgb_acv = x_rgb['Conv3d_5_x'].view(x_rgb['Conv3d_5_x'].shape[0], -1)
 #                flow_acv = x_flow['Conv3d_5_x'].view(x_flow['Conv3d_5_x'].shape[0], -1)
