@@ -137,34 +137,18 @@ def denormalize_buffer(buffer):
     return buffer
 
 def flow_mean_sub(buffer):
-    
-    clip = False
-    
-    # extend the dimension if buffer is a clip
-    if len(buffer.shape) == 4:
-        buffer = np.expand_dims(buffer, 0)
-        clip = True
-    
-    # buffer sum of shape (clip_num, flow_dim, h, w, chnl)
+     
+    # buffer shape (clip_num, depth, h, w, chnl)
+    # buffer sum of shape (clip_num, h, w, chnl)
     sh = buffer.shape
-    buffer_sum = np.zeros((sh[0], 2, sh[2], sh[3], 1))
     
-    # summation of flow, 0 -> u, 1 -> v
-    for l in range(sh[1]):
-        buffer_sum[:, l % 2] += buffer[:, l]
-    
-    # average
-    buffer_sum /= (sh[1] // 2)
+    # sum and average over the depth (l) axis
+    buffer_mean = np.sum(buffer, axis = 1) / sh[1]
     
     # substract the mean
-    for l in range(sh[1]):
-        buffer[:, l] -= buffer_sum[:, l % 2]
-        # scale up to between [0, 255]
-        buffer[:, l] += np.abs(np.min(buffer[:, l]))
-        buffer[:, l] = buffer[:, l] / np.max(buffer[:, l]) * 255
-        
-    if clip:
-        buffer = buffer.view(sh[1:])
+    buffer -= np.expand_dims(buffer_mean, 1)
+    buffer += np.abs(np.min(buffer, axis = (1, 2, 3))).reshape(sh[0], 1, 1, 1, sh[4])
+    buffer = buffer / np.max(buffer, axis = (1, 2, 3)).reshape(sh[0], 1, 1, 1, sh[4]) * 255
         
     return buffer
 
@@ -211,7 +195,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     if modality == 'rgb':
         frame_chn = 3
     else:
-        frame_chn = 1 #2
+        frame_chn = 2 #1
     
     if mode in ['train', 'validation']:
         t_index = []
@@ -232,8 +216,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     # create a buffer with size of 
     # video [clip_count, clip_len, height, width, channel]
     #buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
-    buffer = np.empty((clips_per_video, output_len if modality == 'rgb' else output_len * 2,
-                       output_h, output_w, frame_chn), np.float32)
+    buffer = np.empty((clips_per_video, output_len, output_h, output_w, frame_chn), np.float32)
     
     # loading cropped video frames into the numpy array
     for c in range(clips_per_video):
@@ -276,8 +259,8 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
                     if modality == 'rgb':
                         np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
                     else:
-                        #np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
-                        np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                        np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
+                        #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
                         
                 else:
                     print(path_content[i][count])
@@ -310,17 +293,17 @@ def transpose_clip_buffer(buffer):
             
     
 if __name__ == '__main__':
-    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
-    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
-    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    #buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'val', mean_sub=True)
-    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
+    #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
+    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
+    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
+    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
+    #buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=False)
     #buffer = transpose_video_buffer(buffer)
     buffer = transpose_clip_buffer(buffer)
-    buffer0 = buffer[0, :, :, :]
-    #buffer1 = buffer[1, :, :, :]
+    buffer0 = buffer[3, :, :, 0]
+    buffer1 = buffer[3, :, :, 1]
     #buffer0 = cv2.cvtColor(buffer0, cv2.COLOR_RGB2BGR)
     cv2.imshow('buffer0', buffer0)
-    #cv2.imshow('buffer1', buffer1)
+    cv2.imshow('buffer1', buffer1)
     cv2.waitKey(0)
     cv2.destroyAllWindows()

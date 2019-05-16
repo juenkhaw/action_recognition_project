@@ -9,7 +9,7 @@ import torch
 import pickle
 
 # read in caffe model
-with open('r2p1d_pretrained/r2.5d_d18_l8.pkl', 'rb') as l8:
+with open('r2p1d_pretrained/r2.5d_d34_l32_ft_sports1m.pkl', 'rb') as l8:
     ppp = pickle.load(l8, encoding='latin1')
     ppp = ppp['blobs']
     
@@ -26,17 +26,40 @@ bn_mapping = {'b' : 'bias',
               'rm' : 'running_mean', 
               'riv' : 'running_var', 
               's' : 'weight'}
-sc_mapping = {'2' : ['conv3_x', 'conv3_1'], 
-           '4' : ['conv4_x', 'conv4_1'], 
-           '6' : ['conv5_x', 'conv5_1']}
+
+# for 34-layer model
+sc_mapping = {'3' : ['conv3_x', 'conv3_1'],
+              '7' : ['conv4_x', 'conv4_1'],
+              '13' : ['conv5_x', 'conv5_1']}
 comp_mapping = {'0' : ['conv2_x', 'conv2_1'], 
                 '1' : ['conv2_x', 'conv2_2'], 
-                '2' : ['conv3_x', 'conv3_1'], 
-                '3' : ['conv3_x', 'conv3_2'], 
-                '4' : ['conv4_x', 'conv4_1'], 
-                '5' : ['conv4_x', 'conv4_2'], 
-                '6' : ['conv5_x', 'conv5_1'], 
-                '7' : ['conv5_x', 'conv5_2'], }
+                '2' : ['conv2_x', 'conv2_3'], 
+                '3' : ['conv3_x', 'conv3_1'], 
+                '4' : ['conv3_x', 'conv3_2'], 
+                '5' : ['conv3_x', 'conv3_3'], 
+                '6' : ['conv3_x', 'conv3_4'], 
+                '7' : ['conv4_x', 'conv4_1'], 
+                '8' : ['conv4_x', 'conv4_2'],
+                '9' : ['conv4_x', 'conv4_3'],
+                '10' : ['conv4_x', 'conv4_4'],
+                '11' : ['conv4_x', 'conv4_5'],
+                '12' : ['conv4_x', 'conv4_6'],
+                '13' : ['conv5_x', 'conv5_1'],
+                '14' : ['conv5_x', 'conv5_2'],
+                '15' : ['conv5_x', 'conv5_3'],}
+
+# for 18-layer mode
+#sc_mapping = {'2' : ['conv3_x', 'conv3_1'], 
+#              '4' : ['conv4_x', 'conv4_1'], 
+#              '6' : ['conv5_x', 'conv5_1']}
+#comp_mapping = {'0' : ['conv2_x', 'conv2_1'], 
+#                '1' : ['conv2_x', 'conv2_2'], 
+#                '2' : ['conv3_x', 'conv3_1'], 
+#                '3' : ['conv3_x', 'conv3_2'], 
+#                '4' : ['conv4_x', 'conv4_1'], 
+#                '5' : ['conv4_x', 'conv4_2'], 
+#                '6' : ['conv5_x', 'conv5_1'], 
+#                '7' : ['conv5_x', 'conv5_2'], }
     
 # mapping between state_dict keys
 for p in keys:
@@ -105,4 +128,4 @@ for p in keys:
 #    print(p)
         
 save = {'train' : {'state_dict' : model}}
-torch.save(save, 'kinetic-d18-l16.pth.tar')
+torch.save(save, 'kinetic-s1m-d34-l32.pth.tar')

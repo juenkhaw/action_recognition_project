@@ -96,7 +96,7 @@ if args.verbose2:
 # intitalize model properties
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
-in_channels = {'rgb' : 3, 'flow' : 1}
+in_channels = {'rgb' : 3, 'flow' : 2}
 stream_endp = {'average' : ['SCORES'], 
                'feature-3-layer' : ['AP', 'FC'], 
                'modality-3-layer' : ['AP', 'FC'], 

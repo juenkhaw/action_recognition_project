@@ -71,7 +71,7 @@ if args.pretrain:
 gpu_name = 'cuda:0'
 all_gpu = ['cuda:0']
 device = torch.device(gpu_name if torch.cuda.is_available() and args.device == 'gpu' else 'cpu')
-num_devices = torch.cuda.device_count() 
+num_devices = torch.cuda.device_count()
 
 # printing device info
 if args.verbose2:
@@ -83,7 +83,7 @@ if args.verbose2:
 # intitalize model properties
 layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
-in_channels = {'rgb' : 3, 'flow' : 1}
+in_channels = {'rgb' : 3, 'flow' : 2}
 
 # intialize save content
 save_content = {}
@@ -109,7 +109,7 @@ if args.load_model is not None or args.pretrain:
     
     # freeze part of the model if it is a pretrained model
     if args.pretrain:
-        model.freeze('conv5_x')
+        model.freeze('conv3_x')
     
     print('************* LOADED **************')
     
@@ -140,9 +140,10 @@ try:
         
         # define criterion, optimizer and scheduler
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr = 1e-2)
+        optimizer = optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.1)
+        #optimizer = optim.RMSprop(model.parameters(), lr = 1e-2, alpha = 0.99)
         # trying on dynamic scheduler
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, threshold = 1e-3, min_lr = 1e-6)
         
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
