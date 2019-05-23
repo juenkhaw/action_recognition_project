@@ -74,6 +74,10 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
     subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
+    best_model = {'epoch' : 0, 
+                  'model_state' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
         
     # load the model state that is to be continued for training
     if args.load_model is not None and not args.pretrain:
@@ -178,7 +182,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     # avearging over validation results and compute val loss
                     if phase == 'val':
                         
-                        current_loss += criterion(outputs, labels) * labels.shape[0]
+                        current_loss += criterion(outputs, labels).item() * labels.shape[0]
                         
                         _, preds = torch.max(outputs, 1)
                         current_correct += torch.sum(preds == labels.data)
@@ -201,6 +205,13 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             # step on reduceLRonPlateau with val acc
             if scheduler is not None and phase == 'val':
                 scheduler.step(epoch_acc)
+        
+        if losses['val'][epoch] <= best_model['val_loss']:
+            #if losses['train'][epoch] <= best_model['train_loss']:
+            best_model = {'epoch' : epoch + 1, 
+                  'model_state' : model.state_dict(), 
+                  'train_loss' : losses['train'][epoch], 
+                  'val_loss' : losses['val'][epoch]}
             
         if args.verbose2:
             #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
@@ -219,7 +230,8 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                                     state_dict = model.state_dict(),
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
-                                    epoch = epoch + 1
+                                    epoch = epoch + 1,
+                                    best = best_model
                                     )
             
     # display the time elapsed
@@ -231,18 +243,23 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
     #print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
     
-    return losses, accs, time_elapsed
+    return losses, accs, time_elapsed, best_model
 
-def train_pretrained_stream(args, device, models, dataloaders, optimizer, criterion, scheduler, save_content):
+def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, scheduler, save_content):
     
-    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
-    subbatch_count = {'train' : args.batch_size, 'val' : args.test_batch_size}
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
     
     losses = {'train' : [], 'val': []}
     accs = {'train' : [], 'val': []}
     epoch = 0
     start = time.time()
     prev_elapsed = 0
+    
+    best_model = {'epoch' : 0, 
+                  'model_state' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
     
     # LOAD INTERMEDIATE STATE
     if (args.load_stream is not [] or args.load_fusion is not []) and not args.pretrain:
@@ -401,6 +418,13 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
             if phase == 'val':
                 scheduler.step(epoch_acc)
                 
+        if losses['val'][epoch] <= best_model['val_loss']:
+            #if losses['train'][epoch] <= best_model['train_loss']:
+            best_model = {'epoch' : epoch + 1, 
+                  'model_state' : models['fusion'].state_dict(), 
+                  'train_loss' : losses['train'][epoch], 
+                  'val_loss' : losses['val'][epoch]}
+                
         if args.verbose2:
             print('Epoch %d | Network %s | lr %.1E | TrainLoss %.4f | ValLoss %.4f | TrainAcc %.4f | ValAcc %.4f' % 
                   (epoch + 1, 'Fusion', lr, losses['train'][epoch], losses['val'][epoch], 
@@ -415,7 +439,7 @@ def train_pretrained_stream(args, device, models, dataloaders, optimizer, criter
         
     return losses, accs, time_elapsed
     
-def train_e2e(args, device, models, dataloaders, optimizers, criterions, schedulers, save_content):
+def train_e2e_fusion(args, device, models, dataloaders, optimizers, criterions, schedulers, save_content):
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
     

@@ -140,11 +140,11 @@ try:
         
         # define criterion, optimizer and scheduler
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.1)
+        optimizer = optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.5)
         #optimizer = optim.RMSprop(model.parameters(), lr = 1e-2, alpha = 0.99)
         # trying on dynamic scheduler
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, threshold = 1e-3, min_lr = 1e-6)
-        
+            
         # preparing the training and validation dataset
         train_dataloader = DataLoader(
                 VideoDataset(args.dataset_path, args.dataset, args.split, 'train', args.modality, mean_sub = args.meansub, 
@@ -163,7 +163,7 @@ try:
                   '\n***********************************')
             
         # train
-        losses, accs, train_elapsed = train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content)
+        losses, accs, train_elapsed, best_model = train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content)
         
         if args.save:
             save_training_model(args, 'train', save_content,  
@@ -173,7 +173,8 @@ try:
                                     state_dict = model.state_dict(),
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
-                                    epoch = args.epoch
+                                    epoch = args.epoch,
+                                    best = best_model
                                     )
     # execute testing
     if args.test:

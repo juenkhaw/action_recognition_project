@@ -13,9 +13,9 @@ class FusionNet(nn.Module):
     
     VALID_FUSION = (
             'average',
-            'modality-3-layer',
-            'modality-3-layer-PREAP',
-            'feature-3-layer'
+            'vanilla-ld3',
+            'vanilla-sigmoid-ld3',
+            'feature-ld3'
             )
     
     VALID_ENDPOINTS = (
@@ -41,7 +41,7 @@ class FusionNet(nn.Module):
 #            self.linear1 = nn.Linear(1024, 2, bias=use_bias)
 #            self.softmax = nn.Softmax(dim = 1)
         
-        if self._fusion == 'feature-3-layer':
+        if self._fusion == 'feature-ld3':
             
             self.linear1 = nn.Linear(1024, 4096, bias = use_bias)
             self.bn1 = nn.BatchNorm1d(4096, momentum=bn_momentum, eps=bn_epson)
@@ -51,10 +51,10 @@ class FusionNet(nn.Module):
             
             self.linear3 = nn.Linear(2048, 1024, bias = use_bias)
             
-            self.softmax = nn.Softmax(dim = 1)
+            self.output = nn.Softmax(dim = 1)
             self.relu = nn.ReLU()
             
-        elif self._fusion == 'modality-3-layer':
+        elif self._fusion == 'vanilla-ld3':
             
             self.linear1 = nn.Linear(1024, 256, bias=use_bias)
             self.bn1 = nn.BatchNorm1d(256, momentum=bn_momentum, eps=bn_epson)
@@ -64,7 +64,20 @@ class FusionNet(nn.Module):
             
             self.linear3 = nn.Linear(64, 2, bias=use_bias)
             
-            self.softmax = nn.Softmax(dim = 1)
+            self.output = nn.Softmax(dim = 1)
+            self.relu = nn.ReLU()
+            
+        elif self._fusion == 'vanilla-sigmoid-ld3':
+            
+            self.linear1 = nn.Linear(1024, 256, bias=use_bias)
+            self.bn1 = nn.BatchNorm1d(256, momentum=bn_momentum, eps=bn_epson)
+            
+            self.linear2 = nn.Linear(256, 64, bias=use_bias)
+            self.bn2 = nn.BatchNorm1d(64, momentum=bn_momentum, eps=bn_epson)
+            
+            self.linear3 = nn.Linear(64, 1, bias=use_bias)
+            
+            self.output = nn.Sigmoid(dim = 1)
             self.relu = nn.ReLU()
             
         elif self._fusion == 'modality-3-layer-PREAP':
@@ -92,7 +105,7 @@ class FusionNet(nn.Module):
             
         else:
             
-            if self._fusion in ['feature-3-layer', 'modality-3-layer']:
+            if self._fusion in ['vanilla-ld3', 'vanilla-sigmoid-ld3', 'feature-ld3']:
                 
                 # taking the average of final feature activations over samples for each modalities
                 rgb_ap = x_rgb['AP'].reshape(x_rgb['AP'].shape[:2])
@@ -106,28 +119,30 @@ class FusionNet(nn.Module):
 #                    ratio_out = self.softmax(self.linear1(ratio_out))
 #                    
 #                    fusion_out = x_rgb['FC'] * ratio_out[:, 0].reshape(ratio_out.shape[0], 1) + x_flow['FC'] * ratio_out[:, 1].reshape(ratio_out.shape[0], 1)
-                    
-                if self._fusion in ['modality-3-layer', 'feature-3-layer']:
                 
-                    ratio_out = self.relu(self.bn1(self.linear1(ratio_out)))
-                    ratio_out = self.relu(self.bn2(self.linear2(ratio_out)))
+                ratio_out = self.relu(self.bn1(self.linear1(ratio_out)))
+                ratio_out = self.relu(self.bn2(self.linear2(ratio_out)))
 #                    ratio_out = self.relu(self.linear1(ratio_out))
 #                    ratio_out = self.relu(self.linear2(ratio_out))
-                    ratio_out = self.linear3(ratio_out)
-                    
-                    if self._fusion == 'feature-3-layer':
-                        rgb_w = torch.sum(ratio_out[:, 0:512], dim = 1).view((-1, 1))
-                        flow_w = torch.sum(ratio_out[:, 512:], dim = 1).view((-1, 1))
-                        ratio_out = torch.cat((rgb_w, flow_w), dim = 1)
-                    
-                    ratio_out = self.softmax(ratio_out)
+                ratio_out = self.output(self.linear3(ratio_out))
+                
+                if self._fusion == 'feature-ld3':
+                    rgb_w = torch.sum(ratio_out[:, 0:512], dim = 1).view((-1, 1))
+                    flow_w = torch.sum(ratio_out[:, 512:], dim = 1).view((-1, 1))
+                    #ratio_out = torch.cat((rgb_w, flow_w), dim = 1)
+                
+                elif self._fusion == 'vanilla-ld3':
                     rgb_scores = x_rgb['FC'] * ratio_out[:, 0].reshape(ratio_out.shape[0], 1)
                     flow_scores = x_flow['FC'] * ratio_out[:, 1].reshape(ratio_out.shape[0], 1)
                     
-                    print('RGB', torch.max(x_rgb['FC'], 1)[1], '\nFLOW', 
-                          torch.max(x_flow['FC'], 1)[1], '\nW', ratio_out)
-                    
-                    fusion_out = rgb_scores + flow_scores
+                elif self._fusion == 'vanilla-sigmoid-ld3':
+                    rgb_scores = x_rgb['FC'] * ratio_out.reshape(ratio_out.shape[0], 1)
+                    flow_scores = x_flow['FC'] * (1 - (ratio_out.reshape(ratio_out.shape[0], 1)))
+                
+#                print('RGB', torch.max(x_rgb['FC'], 1)[1], '\nFLOW', 
+#                      torch.max(x_flow['FC'], 1)[1], '\nW', ratio_out)
+                
+                fusion_out = rgb_scores + flow_scores
                     
                 final_out['WEIGHTS'] = ratio_out
                     

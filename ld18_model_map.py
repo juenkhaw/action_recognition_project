@@ -9,7 +9,7 @@ import torch
 import pickle
 
 # read in caffe model
-with open('r2p1d_pretrained/r2.5d_d34_l32_ft_sports1m.pkl', 'rb') as l8:
+with open('r2p1d_pretrained/r2.5d_d34_l32_ft_sports1m_optical_flow.pkl', 'rb') as l8:
     ppp = pickle.load(l8, encoding='latin1')
     ppp = ppp['blobs']
     
@@ -128,4 +128,4 @@ for p in keys:
 #    print(p)
         
 save = {'train' : {'state_dict' : model}}
-torch.save(save, 'kinetic-s1m-d34-l32.pth.tar')
+torch.save(save, 'kinetic-s1m-d34-l32-of.pth.tar')

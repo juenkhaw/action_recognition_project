@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
 from fusion_network import FusionNet
-from train_net import train_pretrained_stream, save_training_model
+from train_net import train_pref_fusion, save_training_model
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 
@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 parser.add_argument('fusion', help = 'Fusion method to be used', 
-                    choices = ['average', 'modality-3-layer', 'feature-3-layer', 'modality-3-layer-PREAP'])
+                    choices = ['average', 'vanilla-ld3', 'vanilla-sigmoid-ld3', 'feature-ld3'])
 parser.add_argument('archi', help = 'architecture used on complying streams and fusion networks', choices = ['pref', 'e2e'])
 
 # network and optimizer settings
@@ -34,12 +34,14 @@ parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', defaul
 parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
 parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
+parser.add_argument('-vsbs', '--val-subbatch-size', help = 'number of labelled sample for each validation sub-batch', default = 8, type = int)
 parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction on flows', action = 'store_true', default = False)
 
 # model state loading settings
 parser.add_argument('-loadstream', '--load-stream', help = 'paths to the pretrained stream model state_dict (rgb, flow)', nargs = '+', default = [], type = str)
 parser.add_argument('-loadfusion', '--load-fusion', help = 'path to the pretrained fusion network model state_dict (pref : fusion network only, e2e : streams + fusion network)', 
                     nargs = '+', default = [], type = str)
+parser.add_argument('-pretrain', '--pretrain', help = 'indicating whether using pretrained model to train', action = 'store_true', default = False)
 
 # debugging mode settings
 parser.add_argument('-tm', '--test-mode', help = 'activate test mode to minimize dataset for debugging purpose', default = 'none', choices = ['none', 'peek', 'distributed'])
@@ -98,8 +100,9 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 stream_endp = {'average' : ['SCORES'], 
-               'feature-3-layer' : ['AP', 'FC'], 
-               'modality-3-layer' : ['AP', 'FC'], 
+               'vanilla-ld3' : ['AP', 'FC'], 
+               'vanilla-sigmoid-ld3' : ['AP', 'FC'], 
+               'feature-ld3' : ['AP', 'FC'],
                'modality-3-layer-PREAP' : ['conv5_x', 'FC']}
 
 # intialize save content
@@ -121,7 +124,7 @@ if args.archi == 'pref':
 
 # load the stream network model state that is completed training
 # FOR TESTING ONLY
-if (args.load_stream is not [] or args.load_fusion is not []) and (not args.train and args.test):
+if (args.load_stream is not [] or args.load_fusion is not []) and args.pretrain:
         
     print('\n********* LOADING STATE ***********', 
           '\nFusion Mode =', 'End to End' if args.archi == 'e2e' else 'Pretrained Streams'
@@ -131,8 +134,8 @@ if (args.load_stream is not [] or args.load_fusion is not []) and (not args.trai
     if args.archi == 'pref':
         
         assert(len(args.load_stream) == 2)
-        if args.fusion != 'average':
-            assert(len(args.load_fusion) == 1)
+#        if args.fusion != 'average':
+#            assert(len(args.load_fusion) == 1)
         
         rgb_state = torch.load(args.load_stream[0])['train']['state_dict']
         flow_state = torch.load(args.load_stream[1])['train']['state_dict']
@@ -143,7 +146,7 @@ if (args.load_stream is not [] or args.load_fusion is not []) and (not args.trai
         del rgb_state
         del flow_state
         
-        if args.fusion != 'average':
+        if args.fusion != 'average' and len(args.load_fusion) > 0:
             fusion_state = torch.load(args.load_fusion[0])['train']['state_dict']
             fusionnet.load_state_dict(fusion_state)
             
@@ -192,15 +195,15 @@ try:
         criterion = nn.CrossEntropyLoss()
         
         if args.archi == 'e2e':
-            rgb_optimizer = optim.SGD(rgbnet.parameters(), lr = 1e-2)
-            flow_optimizer = optim.SGD(flownet.parameters(), lr = 1e-2)
+            rgb_optimizer = optim.SGD(rgbnet.parameters(), lr = 1e-2, momentum = 0.5)
+            flow_optimizer = optim.SGD(flownet.parameters(), lr = 1e-2, momentum = 0.5)
             
             rgb_scheduler = optim.lr_scheduler.ReduceLROnPlateau(rgb_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
             flow_scheduler = optim.lr_scheduler.ReduceLROnPlateau(flow_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
         
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
-            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2)
+            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2, momentum = 0.1)
             fusion_scheduler = optim.lr_scheduler.ReduceLROnPlateau(fusion_optimizer, patience = 5, threshold = 1e-4, min_lr = 1e-7)
             
         # preparing the training and validation dataset
@@ -211,7 +214,7 @@ try:
         val_dataloader = DataLoader(
                 TwoStreamDataset(args.dataset_path, args.dataset, args.split, 'validation', mean_sub = args.meansub, 
                              clip_len = args.clip_length, test_mode = args.test_mode, test_amt = args.test_amt), 
-                batch_size = args.test_batch_size, shuffle = False)
+                batch_size = args.val_subbatch_size, shuffle = False)
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
         
@@ -222,10 +225,10 @@ try:
             
         # train
         if args.archi == 'pref':
-            losses, accs, train_elapsed = train_pretrained_stream(args, device, 
-                                                                  {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
-                                                                  dataloaders, fusion_optimizer, criterion, 
-                                                                  fusion_scheduler, None)
+            losses, accs, train_elapsed = train_pref_fusion(args, device, 
+                                                            {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
+                                                            dataloaders, fusion_optimizer, criterion, 
+                                                            fusion_scheduler, None)
 #        elif args.train_option == 'pref':
 #            losses, accs, train_elapsed = train_fusion(args, device, 
 #                                                   {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
