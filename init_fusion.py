@@ -100,9 +100,9 @@ layer_sizes = {18 : [2, 2, 2, 2], 34 : [3, 4, 6, 3]}
 num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 stream_endp = {'average' : ['SCORES'], 
-               'vanilla-ld3' : ['AP', 'SCORES'], 
-               'vanilla-sigmoid-ld3' : ['AP', 'SCORES'], 
-               'feature-ld3' : ['AP', 'SCORES'],
+               'vanilla-ld3' : ['AP', 'FC'], 
+               'vanilla-sigmoid-ld3' : ['AP', 'FC'], 
+               'feature-ld3' : ['AP', 'FC'],
                'modality-3-layer-PREAP' : ['conv5_x', 'FC']}
 
 # intialize save content
@@ -137,8 +137,8 @@ if (args.load_stream is not [] or args.load_fusion is not []) and args.pretrain:
 #        if args.fusion != 'average':
 #            assert(len(args.load_fusion) == 1)
         
-        rgb_state = torch.load(args.load_stream[0])['train']['best']['state_dict']
-        flow_state = torch.load(args.load_stream[1])['train']['best']['state_dict']
+        rgb_state = torch.load(args.load_stream[0])['train']['state_dict']
+        flow_state = torch.load(args.load_stream[1])['train']['state_dict']
         
         rgbnet.load_state_dict(rgb_state)
         flownet.load_state_dict(flow_state)
@@ -192,8 +192,7 @@ try:
                   '\nSplit =', args.split)
         
         # define criterion, optimizer and scheduler
-        stream_criterion = nn.CrossEntropyLoss()
-        fusion_criterion = nn.NLLLoss()
+        criterion = nn.CrossEntropyLoss()
         
         if args.archi == 'e2e':
             rgb_optimizer = optim.SGD(rgbnet.parameters(), lr = 1e-2, momentum = 0.5)
@@ -204,7 +203,7 @@ try:
         
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
-            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-3, momentum = 0.5)
+            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2, momentum = 0.1)
             fusion_scheduler = optim.lr_scheduler.ReduceLROnPlateau(fusion_optimizer, patience = 5, threshold = 1e-4, min_lr = 1e-7)
             
         # preparing the training and validation dataset
@@ -228,7 +227,7 @@ try:
         if args.archi == 'pref':
             losses, accs, train_elapsed = train_pref_fusion(args, device, 
                                                             {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
-                                                            dataloaders, fusion_optimizer, fusion_criterion, 
+                                                            dataloaders, fusion_optimizer, criterion, 
                                                             fusion_scheduler, None)
 #        elif args.train_option == 'pref':
 #            losses, accs, train_elapsed = train_fusion(args, device, 

@@ -24,7 +24,7 @@ class FusionNet(nn.Module):
             )
     
     def __init__(self, fusion = 'average', use_bias = True, bn_momentum = 0.1, bn_epson = 1e-3, 
-                 endpoint = ['SCORES']):
+                 endpoint = ['FC']):
         
         super(FusionNet, self).__init__()
         
@@ -132,12 +132,12 @@ class FusionNet(nn.Module):
                     #ratio_out = torch.cat((rgb_w, flow_w), dim = 1)
                 
                 elif self._fusion == 'vanilla-ld3':
-                    rgb_scores = x_rgb['SCORES'] * ratio_out[:, 0].reshape(ratio_out.shape[0], 1)
-                    flow_scores = x_flow['SCORES'] * ratio_out[:, 1].reshape(ratio_out.shape[0], 1)
+                    rgb_scores = x_rgb['FC'] * ratio_out[:, 0].reshape(ratio_out.shape[0], 1)
+                    flow_scores = x_flow['FC'] * ratio_out[:, 1].reshape(ratio_out.shape[0], 1)
                     
                 elif self._fusion == 'vanilla-sigmoid-ld3':
-                    rgb_scores = x_rgb['SCORES'] * ratio_out.reshape(ratio_out.shape[0], 1)
-                    flow_scores = x_flow['SCORES'] * (1 - (ratio_out.reshape(ratio_out.shape[0], 1)))
+                    rgb_scores = x_rgb['FC'] * ratio_out.reshape(ratio_out.shape[0], 1)
+                    flow_scores = x_flow['FC'] * (1 - (ratio_out.reshape(ratio_out.shape[0], 1)))
                 
 #                print('RGB', torch.max(x_rgb['FC'], 1)[1], '\nFLOW', 
 #                      torch.max(x_flow['FC'], 1)[1], '\nW', ratio_out)
@@ -163,11 +163,11 @@ class FusionNet(nn.Module):
                 
                 fusion_out = x_rgb['FC'] * ratio_out[:, 0].reshape(ratio_out.shape[0], 1) + x_flow['FC'] * ratio_out[:, 1].reshape(ratio_out.shape[0], 1)
             
-#            if 'FC' in self._endpoint:
-#                final_out['FC'] = fusion_out
+            if 'FC' in self._endpoint:
+                final_out['FC'] = fusion_out
                 
             if 'SCORES' in self._endpoint:
-#                fusion_out = self.final_softmax(fusion_out)
+                fusion_out = self.final_softmax(fusion_out)
                 final_out['SCORES'] = fusion_out
             
         return final_out

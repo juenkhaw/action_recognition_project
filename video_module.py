@@ -150,7 +150,7 @@ def flow_mean_sub(buffer):
     buffer += np.abs(np.min(buffer, axis = (1, 2, 3))).reshape(sh[0], 1, 1, 1, sh[4])
     buffer = buffer / np.max(buffer, axis = (1, 2, 3)).reshape(sh[0], 1, 1, 1, sh[4]) * 255
         
-    return np.round(buffer)
+    return buffer
 
 def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, output_len, 
                mode, mean_sub = True):

@@ -74,6 +74,10 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
     subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
+    best_model = {'epoch' : 0, 
+                  'model_state' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
         
     # load the model state that is to be continued for training
     if args.load_model is not None and not args.pretrain:
@@ -94,7 +98,6 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         accs = content['accuracy']
         start = time.time()
         prev_elapsed = content['train_elapsed']
-        best_model = content['best']
         
         del content
         torch.cuda.empty_cache()
@@ -107,10 +110,6 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         epoch = 0
         start = time.time()
         prev_elapsed = 0
-        best_model = {'epoch' : 0, 
-                  'state_dict' : None, 
-                  'train_loss' : float('inf'), 
-                  'val_loss' : float('inf')}
     
     for epoch in range(epoch, args.epoch):
         
@@ -210,7 +209,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         if losses['val'][epoch] <= best_model['val_loss']:
             #if losses['train'][epoch] <= best_model['train_loss']:
             best_model = {'epoch' : epoch + 1, 
-                  'state_dict' : model.state_dict(), 
+                  'model_state' : model.state_dict(), 
                   'train_loss' : losses['train'][epoch], 
                   'val_loss' : losses['val'][epoch]}
             
@@ -376,10 +375,9 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                             
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-                            _, preds = torch.max(fusion_out['SCORES'], 1)
+                            _, preds = torch.max(fusion_out['FC'], 1)
                             
-                            fusion_loss = criterion(
-                                    torch.log(fusion_out['SCORES']), sub_labels[sb])
+                            fusion_loss = criterion(fusion_out['FC'], sub_labels[sb])
                             
                             # accumulate loss and true positive for the current subbatch
                             current_loss += fusion_loss.item() * sub_rgbX[sb].size(0)
@@ -390,13 +388,12 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                             
                         else:
                             # append the validation result until all subbatches are tested on
-                            outputs = torch.cat((outputs, fusion_out['SCORES']))
+                            outputs = torch.cat((outputs, fusion_out['FC']))
                     
                 # avearging over validation results and compute val loss
                 if phase == 'val':
                     
-                    current_loss += criterion(
-                            torch.log(outputs), labels).item() * labels.shape[0]
+                    current_loss += criterion(outputs, labels).item() * labels.shape[0]
                         
                     _, preds = torch.max(outputs, 1)
                     current_correct += torch.sum(preds == labels.data)
@@ -424,7 +421,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
         if losses['val'][epoch] <= best_model['val_loss']:
             #if losses['train'][epoch] <= best_model['train_loss']:
             best_model = {'epoch' : epoch + 1, 
-                  'state_dict' : models['fusion'].state_dict(), 
+                  'model_state' : models['fusion'].state_dict(), 
                   'train_loss' : losses['train'][epoch], 
                   'val_loss' : losses['val'][epoch]}
                 

@@ -320,5 +320,5 @@ if __name__ is '__main__':
     model = R2Plus1DNet(layer_sizes = [3, 4, 6, 3], num_classes = 101, device = device, in_channels = 3, verbose = True, 
                         endpoint = ['conv5_x', 'SCORES']).to(device)
 
-    x = torch.randn((3, 3, 8, 112, 112)).to(device)
-    out = model(x)
+    #x = torch.randn((1, 3, 8, 112, 112)).to(device)
+    #out = model(x)
