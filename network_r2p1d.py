@@ -208,7 +208,7 @@ class R2Plus1DNet(nn.Module):
     
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
                  in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True, 
-                 endpoint = ['SCORES']):
+                 endpoint = ['SCORES'], dropout = 0):
             
         super(R2Plus1DNet, self).__init__()
         
@@ -249,6 +249,7 @@ class R2Plus1DNet(nn.Module):
         #self.linear = nn.Linear(512, num_classes)
         self.linear1 = nn.Linear(512, num_classes)
         
+        self.dropout1 = nn.Dropout3d(p = dropout)
         self.softmax = nn.Softmax(dim = 1)
         
     def freezeAll(self, unfreeze = False):
@@ -292,6 +293,9 @@ class R2Plus1DNet(nn.Module):
                 print(self.VALID_ENDPOINTS[i], x.shape)
             if self.VALID_ENDPOINTS[i] in self._endpoint:
                 final_out[self.VALID_ENDPOINTS[i]] = x
+                
+        if self.dropout1.p != 0:
+            x = self.dropout1(x)
         
         # pre-fc
         x = self.avgpool(x)

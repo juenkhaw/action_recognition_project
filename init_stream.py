@@ -36,7 +36,8 @@ parser.add_argument('-vsbs', '--val-subbatch-size', help = 'number of labelled s
 parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction on flows', action = 'store_true', default = False)
 
 # model state loading settings
-parser.add_argument('-pretrain', '--pretrain', help = 'indicating whether using pretrained model to train', action = 'store_true', default = False)
+parser.add_argument('-pretrain', '--pretrain', help = 'indicating transfer learning', action = 'store_true', default = False)
+parser.add_argument('-resume', '--resume', help = 'indicating this session is continuing training from last session', action = 'store_true', default = False)
 parser.add_argument('-loadmodel', '--load-model', help = 'path to the pretrained model state_dict', default = None, type = str)
 
 # debugging mode settings
@@ -63,8 +64,8 @@ parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of l
 args = parser.parse_args()
 print('******* ARGUMENTS *******\n', args ,'\n*************************\n')
 
-assert(args.train or args.test)
-if args.pretrain:
+assert(args.train or args.test or args.resume)
+if args.resume or args.pretrain:
     assert(args.load_model is not None)
 
 # SETTINGS OF DEVICES ========================================
@@ -89,29 +90,44 @@ in_channels = {'rgb' : 3, 'flow' : 2}
 save_content = {}
 save_content['args'] = args
 
+print('\n********* LOADING MODEL ***********', 
+          '\nState Path =', args.load_model, 
+          '\nModel Depth =', args.layer_depth, 
+          '\nClip Length =', args.clip_length,
+          '\nTasks =', 'TRAIN' if args.train else '', 'TEST' if args.test else '', 'TRAIN(RESUME)' if args.resume else '')
+
 # define and intialize the network
 model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                                 in_channels = in_channels[args.modality], verbose = args.verbose1, 
-                                bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC']).to(device)
+                                bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC'], 
+                                dropout = 0).to(device)
 
 # load the model state that is completed training
-if args.load_model is not None or args.pretrain:
-        
-    print('\n********* LOADING STATE ***********', 
-          '\nModel Path =', args.load_model)
-    
-    model_state = torch.load(args.load_model)['train']['state_dict']
+if args.load_model is not None:
+            
+    # SWITCH ACCORDING TO SITUATIONS =====================================
+    model_state = torch.load(args.load_model)['train']
+    #model_state = torch.load(args.load_model)['train']['best']
+    #model_state = torch.load(args.load_model)['train']['best']
     
     # load the state model into the network
-    model.load_state_dict(model_state, strict = False)
+    if args.resume or args.train:
+        model.load_state_dict(model_state['state_dict'], strict = False)
+        # migrate the other content
+        save_content['train'] = model_state
+    
+    else:
+        model.load_state_dict(model_state['best']['state_dict'], strict = False)
+    
+    # freeze part of the model if it is a pretrained model
+    if args.pretrain and (args.train or args.resume):
+        model.freeze('conv3_x')
+        
     del model_state
     torch.cuda.empty_cache()
     
-    # freeze part of the model if it is a pretrained model
-    if args.pretrain:
-        model.freeze('conv3_x')
+print('************* LOADED **************')
     
-    print('************* LOADED **************')
     
 try:
 
@@ -131,7 +147,7 @@ try:
         model = nn.DataParallel(model, [int(i[len(i) - 1]) for i in all_gpu], gpu_name[len(gpu_name) - 1])
     
     # execute training
-    if args.train:
+    if args.train or args.resume:
         
         if args.verbose2:
             print('\n************ TRAINING *************', 
