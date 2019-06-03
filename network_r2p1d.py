@@ -196,20 +196,19 @@ class R2Plus1DNet(nn.Module):
     """
     
     VALID_ENDPOINTS = (
-        'Conv3d_1',
-        'Conv3d_2_x',
-        'Conv3d_3_x',
-        'Conv3d_4_x',
-        'Conv3d_5_x',
+        'conv1',
+        'conv2_x',
+        'conv3_x',
+        'conv4_x',
+        'conv5_x',
         'AP',
         'FC',
-        'SCORES',
-        'SOFTMAX'
+        'SCORES'
     )
     
     def __init__(self, layer_sizes, num_classes, device, block_type = SpatioTemporalResBlock, 
                  in_channels = 3, bn_momentum = 0.1, bn_epson = 1e-3, name = 'R2+1D', verbose = True, 
-                 endpoint = ['FC']):
+                 endpoint = ['SCORES'], dropout = 0):
             
         super(R2Plus1DNet, self).__init__()
         
@@ -250,7 +249,20 @@ class R2Plus1DNet(nn.Module):
         #self.linear = nn.Linear(512, num_classes)
         self.linear1 = nn.Linear(512, num_classes)
         
+        self.dropout1 = nn.Dropout3d(p = dropout)
         self.softmax = nn.Softmax(dim = 1)
+        
+    def freezeAll(self, unfreeze = False):
+        for params in self.parameters():
+            params.requires_grad = unfreeze
+            
+    def freeze(self, layer, unfreeze = False):
+        assert(layer in self.VALID_ENDPOINTS[:5])
+        freeze_layer = int(layer.split('_')[0][-1])
+        
+        for i, modul in enumerate(self.net):
+            for params in modul.parameters():
+                params.requires_grad = unfreeze if i < freeze_layer else not unfreeze
         
 
     def replaceLinear(self, num_classes):
@@ -275,12 +287,15 @@ class R2Plus1DNet(nn.Module):
         if self._verbose:
             print('Input', x.shape)
             
-        for i, module in enumerate(self.net):
+        for i, modul in enumerate(self.net):
             x = self.net[i](x)
             if self._verbose:
                 print(self.VALID_ENDPOINTS[i], x.shape)
             if self.VALID_ENDPOINTS[i] in self._endpoint:
-                final_out[self.VALID_ENDPOINTS] = x
+                final_out[self.VALID_ENDPOINTS[i]] = x
+                
+        if self.dropout1.p != 0:
+            x = self.dropout1(x)
         
         # pre-fc
         x = self.avgpool(x)
@@ -295,34 +310,19 @@ class R2Plus1DNet(nn.Module):
         x = self.linear1(x)
         if self._verbose:
             print('Post FC', x.shape)
+            
+        if 'FC' in self._endpoint:
+            final_out['FC'] = x
         
-        if 'SOFTMAX' in self._endpoint:
-            final_out['SOFTMAX'] = self.softmax(x)
-        else:
-            final_out['SCORES'] = x
+        if 'SCORES' in self._endpoint:
+            final_out['SCORES'] = self.softmax(x)
             
         return final_out
 
 if __name__ is '__main__':
     device = torch.device('cuda:0')
-    model = R2Plus1DNet(layer_sizes = [2, 2, 2, 2], num_classes = 101, device = device, in_channels = 3, verbose = True, 
-                        endpoint = ['AP', 'SCORES']).to(device)
-    
-    #from torchsummary import summary
-    #summary(model, (3, 8, 112, 112), batch_size = 2, device = "cpu")
-    
-    #module.model_summary(model)
-    #module.msra_init(model)
+    model = R2Plus1DNet(layer_sizes = [3, 4, 6, 3], num_classes = 101, device = device, in_channels = 3, verbose = True, 
+                        endpoint = ['conv5_x', 'SCORES']).to(device)
 
-    x = torch.randn((1, 3, 8, 112, 112)).to(device)
-    out = model(x)
-    
-#    try:
-#        model(x)
-#    except RuntimeError as e:
-#        pass
-#        if 'out of memory' in str(e):
-#            for p in model.parameters():
-#                if p.grad is not None:
-#                    del p.grad
-#            torch.cuda.empty_cache()
+    #x = torch.randn((1, 3, 8, 112, 112)).to(device)
+    #out = model(x)

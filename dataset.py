@@ -27,9 +27,8 @@ class VideoDataset(Dataset):
         clips_per_video : number of clips to be contained within one video
     """
     
-    def __init__(self, path, dataset, split, mode, modality, clip_len = 16, 
-                 test_mode = True, test_amt = 8, 
-                 load_mode = 'clip', clips_per_video = 1):
+    def __init__(self, path, dataset, split, mode, modality, clip_len = 8, 
+                 test_mode = True, test_amt = [8], mean_sub = False):
    
         # declare the parameters chosen as described in R(2+1)D papers
         self._resize_height = 128
@@ -38,26 +37,18 @@ class VideoDataset(Dataset):
         self._crop_width = 112
         self._mode = mode
         self._crop_depth = clip_len
-        self._load_mode = load_mode
-        self._clips_per_video = clips_per_video
-        
         self._modality = modality
+        self._mean_sub = mean_sub
         
         # validate the arguments
         assert(dataset in ['ucf', 'hmdb'])
         assert(split in list(range(1, 4)))
-        assert(mode in ['train', 'test'])
+        assert(mode in ['train', 'test', 'validation'])
         assert(modality in ['rgb', 'flow'])
         # training should only be done on clips
-        if mode == 'train':
-            assert(load_mode == 'clip')
-        # clip mode should invovle only one clip per video
-        if load_mode == 'clip':
-            assert(clips_per_video == 1)
-        else:
-            assert(clips_per_video > 1)
             
         dataset_name = {'ucf' : 'UCF-101', 'hmdb' : 'HMDB-51'}
+        _test_amt = {'train' : 0, 'test' : 2, 'validation' : 1}
         
         # ************CRUCIAL DATASET DIRECTORY*******************
         main_dir = path
@@ -102,13 +93,30 @@ class VideoDataset(Dataset):
         self._labels = np.array([label for label in labels], dtype = np.int)
         
         # implement test mode to extremely scale down the dataset
-        if test_mode:
+        if test_mode == 'peek':
             #indices = [random.randrange(0, self.__len__()) for i in range(test_amt)]
-            indices = list(range(test_amt))
+            indices = list(range(int(test_amt[0])))
             self._clip_names = (np.array(self._clip_names))[indices]
             self._labels = self._labels[indices]
-            #for i in range(test_amt):
-            #    print(self._clip_names[i], self._labels[i])
+#            #for i in range(test_amt):
+#            #    print(self._clip_names[i], self._labels[i])
+            
+        elif test_mode == 'distributed':
+            
+            _amt = int(test_amt[_test_amt[mode]])
+            freqs = np.bincount(self._labels)
+            assert(_amt <= np.min(freqs))
+            test_clip_names = [[] for i in range(len(freqs) * _amt)]
+            test_labels = []
+            freq_sum = 0
+            for i in range(len(freqs)):
+                freq_sum += freqs[i]
+                for j in range(_amt):
+                    test_clip_names[i * _amt + j] = self._clip_names[freq_sum - freqs[i] + j]
+                    test_labels.append(self._labels[freq_sum - freqs[i] + j])
+            self._clip_names = test_clip_names
+            self._labels = np.array([label for label in test_labels], dtype = np.int)
+            
         
     def __getitem__(self, index):
         # retrieve the preprocessed clip np array
@@ -116,13 +124,13 @@ class VideoDataset(Dataset):
         buffer = load_clips(self._clip_names[index], self._modality, 
                                          self._resize_height, self._resize_width, 
                                          self._crop_height, self._crop_width, self._crop_depth, 
-                                         mode = self._load_mode, 
-                                         clips_per_video = self._clips_per_video)
+                                         mode = self._mode, 
+                                         mean_sub = self._mean_sub)
         return buffer, self._labels[index]
     
     def __len__(self):
         # ensure that the length of X is same with y
-        assert(len(self._clip_names) == len(self._labels))
+        #assert(len(self._clip_names) == len(self._labels))
         return len(self._labels)
     
 class TwoStreamDataset(Dataset):
@@ -140,17 +148,14 @@ class TwoStreamDataset(Dataset):
         clips_per_video : number of clips to be contained within one video
     """
     
-    def __init__(self, path, dataset, split, mode, clip_len = 16, 
-                 test_mode = True, test_amt = 8, 
-                 load_mode = 'clip', clips_per_video = 1):
+    def __init__(self, path, dataset, split, mode, clip_len = 8, 
+                 test_mode = 'distributed', test_amt = 8, mean_sub = True):
         
         self._rgb_set = VideoDataset(path, dataset, split, mode, 'rgb', clip_len = clip_len, 
-                                     test_mode = test_mode, test_amt = test_amt, 
-                                     load_mode = load_mode, clips_per_video = clips_per_video)
+                                     test_mode = test_mode, test_amt = test_amt, mean_sub = False)
         
         self._flow_set = VideoDataset(path, dataset, split, mode, 'flow', clip_len = clip_len, 
-                                     test_mode = test_mode, test_amt = test_amt, 
-                                     load_mode = load_mode, clips_per_video = clips_per_video)
+                                     test_mode = test_mode, test_amt = test_amt, mean_sub = mean_sub)
         
     def __getitem__(self, index):
         # returning rgb, flow and labels at once
@@ -164,74 +169,6 @@ class TwoStreamDataset(Dataset):
         return self._rgb_set.__len__()
     
 if __name__ == '__main__':
-    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = True, 
-                        test_amt = 8, load_mode = 'clip')
+    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = 'distributed', 
+                        test_amt = [2, 1, 0])
     trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)
-    
-#    for x1, x2, y in trainlaoder:
-#        pass
-#        print(x1.shape, x2.shape, y)
-    
-    train1 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'rgb', test_mode = False, 
-                        load_mode = 'video', clips_per_video = 10, clip_len = 16)
-    train2 = VideoDataset('../dataset/UCF-101', 'ucf', 1, 'test', 'flow', test_mode = False, 
-                        load_mode = 'video', clips_per_video = 8, clip_len = 16)
-    
-    buffer, _ = train1.__getitem__(1500)
-    buffer = buffer.transpose((0, 2, 3, 4, 1))
-    
-    import glob
-    from video_module import denormalize_buffer
-    #dirs = glob.glob('../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BandMarching_g05_c01/*jpg')
-    #dirs = glob.glob('../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BandMarching_g05_c01/*jpg')
-    
-    for i in range(buffer.shape[1]):
-        frame = buffer[0, i, :, :, :]
-        frame = denormalize_buffer(frame)
-        # MUST TO CONVERT IF USING IMREAD OF CV2
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = cv2.resize(frame, (frame.shape[0] * 4, frame.shape[1] * 4))
-        cv2.imshow('buffer', frame)
-        #cv2.imshow('buffer', buffer[0, i, :, :, :])
-        cv2.waitKey(0)
-        
-    cv2.destroyAllWindows()
-    
-#    trainloader1 = DataLoader(train1, batch_size = 2, shuffle = True)
-#    trainloader2 = DataLoader(train2, batch_size = 2, shuffle = True)
-#
-#    for vol1, vol2 in zip(trainloader1, trainloader2):
-#        pass
-#        #print(vol1[0].shape, vol1[1])
-#        #print(vol2[0].shape, vol2[1])
-    
-    #test.__getitem__(208)
-    
-#    length = test.__len__()
-#    for i in range(length):
-#        try:
-#            print(str(i) + '/' + str(length) + '\r')
-#            test.__getitem__(i)
-#        except:
-#            print(i, test._clip_names[i][0], test._labels[i])
-#            break
-        
-    #for x, y in test_loader:
-    #    print(i, x.shape, y)
-    #    i += 1
-    
-#    for i in range(0, 10):
-#        img, y = test.__getitem__(i)
-#        print(len(test))
-#        print(img.shape)
-#        print(np.min(img), np.max(img))
-#        print(y)
-#        frame = img[:, 0, :, :].transpose(1, 2, 0)
-#        cv2.imshow('buffer', frame)
-#        cv2.waitKey(0)
-#    for i in range(img.shape[1]):
-#        frame = img[:, i, :, :].transpose(1, 2, 0)
-#        cv2.imshow('buffer', frame)
-#        cv2.waitKey(100)
-    
-    cv2.destroyAllWindows()

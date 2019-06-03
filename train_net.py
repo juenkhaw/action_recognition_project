@@ -1,16 +1,20 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sat Feb  9 21:50:07 2019
+Created on Fri Apr 19 15:42:57 2019
 
 @author: Juen
 """
-from __future__ import print_function
+
 import time
+from math import ceil
+import gc
 
 import torch
 
-from network_r2p1d import R2Plus1DNet
-from fusion_network import FusionNet, FusionNet2
+def memReport():
+    for obj in gc.get_objects():
+        if torch.is_tensor(obj):
+            print(type(obj), obj.size())
 
 def generate_subbatches(sbs, *tensors):
     """
@@ -46,253 +50,417 @@ def generate_subbatches(sbs, *tensors):
     
     return subbatches if len(tensors) > 1 else subbatches[0]
 
-def save_training_model(args, save_content, modality, split, **contents):
+def save_training_model(args, key, save_content, **contents):
     """
     Save the model state after interval of running epochs
     
     Inputs:
         args : Program arguments
         save_content : Accumulated save content
-        modality, split : Recording purpose
         contetns : New contents with key and values to be added into the save_content
         
     Returns:
         None
     """
     
-    # create a new entry with modality as key if it is yet existed
-    if modality not in save_content.keys():
-        save_content[modality] = {}
+    # create/update the current training contents
+    save_content[key] = contents   
     
-    # update the content of current modality/split
-    save_content[modality].update({
-        'split' + str(split) : contents
-    })
-
     save_path = args.savename + '.pth.tar'
     #print('Saving at epoch', epoch + 1)
-    torch.save({
-            'args' : args,
-            'content' : save_content
-            }, save_path)
+    torch.save(save_content, save_path)
     
+def transform_state_dict(state_dict, to_cpu = True, device = None):
+    
+    if not to_cpu:
+        assert(device is not None)
+    
+    for k, v in state_dict.items():
+        if to_cpu:
+            state_dict[k] = v.cpu()
+        else:
+            state_dict[k] = v.to(device)
 
-def train_model(args, device, model, dataloaders, optimizer, criterion, scheduler = None, 
-                pretrained_content = None, modality = None, split = None, save_content = None):
-    """
-    This function trains (and validates if available) network with appointed training set, optmizer, criterion
-    and scheduler (if available), and save the model after running for an interval of epochs, as well as resuming
-    the training with intermediate model state
+def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content):
     
-    Inputs:
-        args : arguments dict passed from main function
-        device : device id to be used in training
-        model : model object to be trained
-        dataloaders : dataloader dict containing dataloaders for training (and validation) datasets
-        optimizer : optimizer object for parameters learning
-        criterion : criterion object for computing loss
-        scheduler : scheduler object for learning rate decay
-        pretrained_content : an intermediate model state previously saved
-        modality, split : recording purpose
-        save_content : current content to be saved
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
+    best_model = {'epoch' : 0, 
+                  'state_dict' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
+    losses = {'train' : [], 'val': []}
+    accs = {'train': [], 'val' : []}
+    epoch = 0
+    start = time.time()
+    prev_elapsed = 0
         
-    Outputs:
-        train_loss : list of training loss for each epoch
-        train_acc : list of training accuracy for each epoch
-        time_elapsed : time taken in training
-    """
-    
-    # loading those forsaken guys if halfway-pretrained model is identified
-    if pretrained_content is not None:
-        train_loss = pretrained_content[modality]['split'+str(split)]['train_loss']
-        train_acc = pretrained_content[modality]['split'+str(split)]['train_acc']
-        start = time.time() - pretrained_content[modality]['split'+str(split)]['train_elapsed']
-        epoch = pretrained_content[modality]['split'+str(split)]['epoch']
-        # loading model is already done in main function
-        optimizer.load_state_dict(pretrained_content[modality]['split'+str(split)]['opt_dict'])
-        if scheduler is not None:
-            scheduler.load_state_dict(pretrained_content[modality]['split'+str(split)]['sch_dict'])
-        if pretrained_content[modality]['split'+str(split)]['stream_weight'] is not None:
-            model.stream_weights = pretrained_content[modality]['split'+str(split)]['stream_weight']
+    # load the model state that is to be continued for training
+    if args.resume:
+        
+        print('\n********* RESUME TRAINING ***********', 
+              '\nLast Epoch =', save_content['train']['epoch'])
+        
+        assert(save_content['train']['epoch'] < args.epoch)
+        
+        # load the state model into the network and other modules
+        #model.load_state_dict(content['state_dict'])
+        optimizer.load_state_dict(save_content['train']['opt_dict'])
+        scheduler.load_state_dict(save_content['train']['sch_dict'])
+        epoch = save_content['train']['epoch']
+        losses = save_content['train']['losses']
+        accs = save_content['train']['accuracy']
+        #start = time.time()
+        prev_elapsed = save_content['train']['train_elapsed']
+        best_model = save_content['train']['best']
+        
+        best_model['state_dict'] = best_model['state_dict']
             
-    # else initializing them with emptiness
-    else:
-        train_loss = []
-        train_acc = []
-        start = time.time()
-        epoch = 0
-    
-    if args.verbose2:
-        print('Starting to train model.......')
-    
     for epoch in range(epoch, args.epoch):
+        
+        for phase in ['train', 'val']:
             
-        for phase in ['train', 'val'] if args.validation_mode else ['train']:
-            
-            batch = 0
-            total_batch = len(dataloaders[phase].dataset) // args.batch_size
+            batch = 1
+            total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
             
             # reset the loss and accuracy
             current_loss = 0
             current_correct = 0
             
-            # initialize the model with respective mode
+            # put the model into appropriate mode
             if phase == 'train':
-                if scheduler is not None:
-                    scheduler.step()
                 model.train()
             else:
                 model.eval()
                 
-            #print(len(dataloaders[phase].dataset))
+            # for each mini batch of dataset
+            for inputs, labels in dataloaders[phase]:
+                
+                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
+                batch += 1
+                
+                # place the input and label into memory of gatherer unit
+                inputs = inputs.to(device)
+                labels = labels.long().to(device)
+                optimizer.zero_grad()
+        
+                # partioning each batch into subbatches to fit into memory
+                if phase == 'train':
+                    sub_inputs, sub_labels = generate_subbatches(subbatch_sizes[phase], inputs, labels)
+                else:
+                    sub_inputs = [inputs]
+                    sub_labels = [labels]
+                
+                del inputs
+                torch.cuda.empty_cache()
             
-            if isinstance(model, R2Plus1DNet):
-            
-                # for each mini batch of dataset
-                for inputs, labels in dataloaders[phase]:
+                # with enabling gradient descent on parameters during training phase
+                with torch.set_grad_enabled(phase == 'train'):
+                
+                    outputs = torch.tensor([], dtype = torch.float).to(device)
+                    sb = 0
+                
+                    for sb in range(len(sub_inputs)):
                     
-                    #print(inputs.shape, labels.shape)
-                    print('Current batch', str(batch), '/', str(total_batch), end = '\r')
-                    batch += 1
-                                
-                    # retrieve the inputs and labels and send to respective computing devices
-                    inputs = inputs.to(device)
-                    labels = labels.long().to(device)
-                    optimizer.zero_grad()
-                    
-                    # partioning each batch into subbatches to fit into memory
-                    sub_inputs, sub_labels = generate_subbatches(args.subbatch_size, inputs, labels)
-                    
-                                        
-                    # with enabling gradient descent on parameters during training phase
-                    with torch.set_grad_enabled(phase == 'train'):
-                        outputs = torch.tensor([], dtype = torch.float).to(device)
-                        for sb in range(len(sub_inputs)):
-                            #print(sub_inputs[sb].shape)
-                            # compute the final scores
-                            #print(sub_inputs[sb].shape)
-                            outputs = model(sub_inputs[sb])
-                            
+                        output = model(sub_inputs[sb])
+                        
+                        if phase == 'train':
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-                            _, preds = torch.max(outputs['SCORES'], 1)
+                            _, preds = torch.max(output['FC'], 1)
                             
                             # compute the loss
-                            loss = criterion(outputs['SCORES'], sub_labels[sb])
+                            loss = criterion(output['FC'], sub_labels[sb])
                             
+                            # accumulate gradients on parameters
                             loss.backward()
                             
                             # accumulate loss and true positive for the current subbatch
                             current_loss += loss.item() * sub_inputs[sb].size(0)
                             current_correct += torch.sum(preds == sub_labels[sb].data)
-                        
-                        
-                        # update parameters if it is training phase
-                        if phase == 'train':
-                            optimizer.step()
-                        
-            else:
-                
-                # for each mini batch of dataset
-                for rgbX, flowX, labels in dataloaders['train']:
-                
-                    #print(inputs.shape, labels.shape)
-                    print('Current batch', str(batch), '/', str(total_batch), end = '\r')
-                    batch += 1
-                                
-                    # retrieve the inputs and labels and send to respective computing devices
-                    rgbX = rgbX.to(device)
-                    flowX = flowX.to(device)
-                    labels = labels.long().to(device)
-                    optimizer.zero_grad()
-                    
-                    # partioning each batch into subbatches to fit into memory
-                    sub_rgbX, sub_flowX, sub_labels = generate_subbatches(args.subbatch_size, rgbX, flowX, labels)
-                    
-                    # with enabling gradient descent on parameters during training phase
-                    with torch.set_grad_enabled(phase == 'train'):
-                        outputs = torch.tensor([], dtype = torch.float).to(device)
-                        for sb in range(len(sub_rgbX)):
                             
-                            # compute the final scores
-                            outputs = model(sub_rgbX[sb], sub_flowX[sb])
+                        else:
+                            # append the validation result until all subbatches are tested on
+                            outputs = torch.cat((outputs, output['FC']))
+                        
+                    # avearging over validation results and compute val loss
+                    if phase == 'val':
+                        
+                        current_loss += criterion(outputs, labels).item() * labels.shape[0]
+                        
+                        _, preds = torch.max(outputs, 1)
+                        current_correct += torch.sum(preds == labels.data)
+            
+                    # update parameters
+                    if phase == 'train':
+                        optimizer.step()
+            
+            # compute the loss and accuracy for the current batch
+            epoch_loss = current_loss / len(dataloaders['train'].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders['train'].dataset)
+            
+            losses[phase].append(epoch_loss)
+            accs[phase].append(epoch_acc)
+            
+            # get current learning rate
+            for param_group in optimizer.param_groups:
+                lr = param_group['lr']
+            
+            # step on reduceLRonPlateau with val acc
+            if scheduler is not None and phase == 'val':
+                scheduler.step(epoch_acc)
+        
+        if losses['val'][epoch] <= best_model['val_loss']:
+            #if losses['train'][epoch] <= best_model['train_loss']:
+            best_model = {'epoch' : epoch + 1, 
+                  'state_dict' : model.state_dict(), 
+                  'train_loss' : losses['train'][epoch], 
+                  'val_loss' : losses['val'][epoch]}
+            
+        if args.verbose2:
+            #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
+            print('Epoch %d | lr %.1E | TrainLoss %.4f | ValLoss %.4f | TrainAcc %.4f | ValAcc %.4f' % 
+                  (epoch + 1, lr, losses['train'][epoch], losses['val'][epoch], 
+                   accs['train'][epoch], accs['val'][epoch]))
+            
+        # time to save these poor guys
+        # dun wanna losing them again
+        if (epoch + 1) % args.save_interval == 0 and args.save:
+            
+            save_training_model(args, 'train', save_content,  
+                                    accuracy = accs,
+                                    losses = losses,
+                                    train_elapsed = time.time() - start,
+                                    state_dict = model.state_dict(),
+                                    opt_dict = optimizer.state_dict(),
+                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                    epoch = epoch + 1,
+                                    best = best_model
+                                    )
+            
+    # display the time elapsed
+    time_elapsed = time.time() - start + prev_elapsed
+    if args.verbose2:
+        print('\n\n+++++++++ TRAINING RESULT +++++++++++',
+              '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
+              '\n+++++++++++++++++++++++++++++++++++++')
+    #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
+    #print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
+    
+    return losses, accs, time_elapsed, best_model
+
+def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, scheduler, save_content):
+    
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
+    
+    losses = {'train' : [], 'val': []}
+    accs = {'train' : [], 'val': []}
+    epoch = 0
+    start = time.time()
+    prev_elapsed = 0
+    
+    best_model = {'epoch' : 0, 
+                  'state_dict' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
+    
+    # LOAD INTERMEDIATE STATE
+    if args.resume:
+        
+        print('\n********* RESUME TRAINING ***********', 
+              '\nLast Epoch =', save_content['train']['epoch'])
+        
+        assert(save_content['train']['epoch'] < args.epoch)
+        
+        # load the state model into the network and other modules
+        #model.load_state_dict(content['state_dict'])
+        optimizer.load_state_dict(save_content['train']['opt_dict'])
+        scheduler.load_state_dict(save_content['train']['sch_dict'])
+        epoch = save_content['train']['epoch']
+        losses = save_content['train']['losses']
+        accs = save_content['train']['accuracy']
+        #start = time.time()
+        prev_elapsed = save_content['train']['train_elapsed']
+        best_model = save_content['train']['best']
+        #best_model['val_loss'] = content['best']['val_loss']
+        
+        #model.freeze('conv3_x')
+    
+    # freeze the streams for all the time
+    models['rgb'].freezeAll()
+    models['flow'].freezeAll()
+    models['rgb'].eval()
+    models['flow'].eval()
+    
+    # ensure that the target epoch is higher from pretrained state
+    assert(epoch < args.epoch)
+    
+    for epoch in range(epoch, args.epoch):
+        
+        for phase in ['train', 'val']:
+            
+            batch = 1
+            total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
+            
+            # reset the loss and accuracy
+            current_loss = 0
+            current_correct = 0
+            
+            if phase == 'train':
+                models['fusion'].train()
+            else:
+                models['fusion'].eval()
+                
+            # for each mini batch of dataset
+            for rgbX, flowX, labels in dataloaders[phase]:
+                
+                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
+                batch += 1
+                
+                # place the input and label into memory of gatherer unit
+                rgbX = rgbX.to(device)
+                flowX = flowX.to(device)
+                labels = labels.long().to(device)
+                
+#                # format validation input volume
+#                if phase == 'val':
+#                    rgbX = rgbX.view(-1, rgbX.shape[2], rgbX.shape[3], 
+#                             rgbX.shape[4], rgbX.shape[5])
+#                    flowX = flowX.view(-1, flowX.shape[2], flowX.shape[3], 
+#                             flowX.shape[4], flowX.shape[5])
+                    
+                # partioning each batch into subbatches to fit into memory
+                sub_rgbX, sub_flowX, sub_labels = generate_subbatches(subbatch_sizes[phase], rgbX, flowX, labels)
+                assert(len(sub_rgbX) == len(sub_flowX))
+                
+                del rgbX
+                del flowX
+                torch.cuda.empty_cache()
+                
+                # clear out the gradient in parameters
+                optimizer.zero_grad()
+                
+                # with enabling gradient descent on parameters during training phase
+                with torch.set_grad_enabled(phase == 'train'):
+                    outputs = torch.tensor([], dtype = torch.float).to(device)
+                    sb = 0
+                    
+                    for sb in range(len(sub_rgbX)):
+                        
+                        torch.cuda.empty_cache()
+                        
+                        rgb_out = models['rgb'](sub_rgbX[sb])
+                        flow_out = models['flow'](sub_flowX[sb])
+                        fusion_out = models['fusion'](rgb_out, flow_out)
+                        
+                        if phase == 'train':
                             
                             # transforming outcome from a series of scores to a single scalar index
                             # indicating the index where the highest score held
-                            _, preds = torch.max(outputs['FUSION_SCORES'], 1)
-#                            _, preds1 = torch.max(outputs['RGB_SCORES'], 1)
-#                            _, preds2 = torch.max(outputs['FLOW_SCORES'], 1)
-#                            
-#                            print(preds, preds1, preds2)
-#                            print(list(model.rgb_net.parameters())[0].requires_grad)
+                            _, preds = torch.max(fusion_out['FC'], 1)
                             
-                            # compute the loss
-                            if not model.pretrained_streams:
-                                rgb_loss = criterion(outputs['RGB_SCORES'], sub_labels[sb])
-                                flow_loss = criterion(outputs['FLOW_SCORES'], sub_labels[sb])
-                                
-                            fusion_loss = criterion(outputs['FUSION_SCORES'], sub_labels[sb])
+                            fusion_loss = criterion(fusion_out['FC'], sub_labels[sb])
                             
                             # accumulate loss and true positive for the current subbatch
                             current_loss += fusion_loss.item() * sub_rgbX[sb].size(0)
                             current_correct += torch.sum(preds == sub_labels[sb].data)
                             
-                            if not model.pretrained_streams:
-                                # backprop on stream network first
-                                rgb_loss.backward(retain_graph = True)
-                                flow_loss.backward(retain_graph = True)
-                                
-                                # freeze the stream before backprop on fusion network
-                                model.freeze_stream()
-                                fusion_loss.backward()
-                                model.freeze_stream(unfreeze = True)
-                                
-                            else:
-                                fusion_loss.backward()
-#                                                        
-#                            _, preds = torch.max(outputs, 1)
-#                            
-#                            # compute the loss
-#                            loss = criterion(outputs, sub_labels[sb])
-#                            
-#                            loss.backward()
-#                            
-#                            # accumulate loss and true positive for the current subbatch
-#                            current_loss += loss.item() * sub_rgbX[sb].size(0)
-#                            current_correct += torch.sum(preds == sub_labels[sb].data)
+                            # direct backprop in fusion network as stream is always froze
+                            fusion_loss.backward()
+                            
+                        else:
+                            # append the validation result until all subbatches are tested on
+                            outputs = torch.cat((outputs, fusion_out['FC']))
+                    
+                # avearging over validation results and compute val loss
+                if phase == 'val':
+                    
+                    current_loss += criterion(outputs, labels).item() * labels.shape[0]
                         
-                        # update parameters if it is training phase
-                        if phase == 'train':
-                            optimizer.step()
-                
+                    _, preds = torch.max(outputs, 1)
+                    current_correct += torch.sum(preds == labels.data)
+                    
+                else: # update parameters when phase == train
+                    optimizer.step()
+                    
             # compute the loss and accuracy for the current batch
-            epoch_loss = current_loss / len(dataloaders[phase].dataset)
-            epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
+            lr = {}
+
+            epoch_loss = current_loss / len(dataloaders['train'].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders['train'].dataset)
             
-            train_loss.append(epoch_loss)
-            train_acc.append(epoch_acc)
+            losses[phase].append(epoch_loss)
+            accs[phase].append(epoch_acc)
             
-            if args.verbose2:
-                #print(f'Epoch {epoch} | Phase {phase} | Loss {epoch_loss:.4f} | Accuracy {epoch_acc:.2f}')
-                print('Epoch %d | Phase %s | Loss %.4f | Accuracy %.4f' % (epoch + 1, phase, epoch_loss, epoch_acc))
-        
+            # get current learning rate
+            for param_group in optimizer.param_groups:
+                lr = param_group['lr']
+                
+            # step on reduceLRonPlateau with val acc
+            if phase == 'val':
+                scheduler.step(epoch_acc)
+                
+        if losses['val'][epoch] <= best_model['val_loss']:
+            #if losses['train'][epoch] <= best_model['train_loss']:
+            best_model = {'epoch' : epoch + 1, 
+                  'state_dict' : models['fusion'].state_dict(), 
+                  'train_loss' : losses['train'][epoch], 
+                  'val_loss' : losses['val'][epoch]}
+                
+        if args.verbose2:
+            print('Epoch %d | Network %s | lr %.1E | TrainLoss %.4f | ValLoss %.4f | TrainAcc %.4f | ValAcc %.4f' % 
+                  (epoch + 1, 'Fusion', lr, losses['train'][epoch], losses['val'][epoch], 
+                   accs['train'][epoch], accs['val'][epoch]))
+            
         # time to save these poor guys
         # dun wanna losing them again
         if (epoch + 1) % args.save_interval == 0 and args.save:
             
-            save_training_model(args, save_content, modality, split, 
-                                train_acc = train_acc,
-                                train_loss = train_loss,
-                                train_elapsed = time.time() - start,
-                                state_dict = model.state_dict(),
-                                stream_weight = model.stream_weights if isinstance(model, FusionNet2) else None, 
-                                opt_dict = optimizer.state_dict(),
-                                sch_dict = scheduler.state_dict() if scheduler is not None else {},
-                                epoch = epoch + 1)
+            save_training_model(args, 'train', save_content,  
+                                    accuracy = accs,
+                                    losses = losses,
+                                    train_elapsed = time.time() - start,
+                                    state_dict = models['fusion'].state_dict(),
+                                    opt_dict = optimizer.state_dict(),
+                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
+                                    epoch = epoch + 1,
+                                    best = best_model
+                                    )
             
     # display the time elapsed
-    time_elapsed = time.time() - start    
-    #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
-    print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
+    time_elapsed = time.time() - start + prev_elapsed
+    if args.verbose2:
+        print('\n\n+++++++++ TRAINING RESULT +++++++++++',
+              '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
+              '\n+++++++++++++++++++++++++++++++++++++')
+        
+    return losses, accs, time_elapsed, best_model
     
-    return train_loss, train_acc, time_elapsed
+def train_e2e_fusion(args, device, models, dataloaders, optimizers, criterions, schedulers, save_content):
+    
+    subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.sub_test_batch_size}
+    subbatch_count = {'train' : args.batch_size, 'val' : args.val_subbatch_size}
+    
+    losses = {'train' : {'rgb' : [],'flow' : [],'fusion' : []}, 
+                'val': {'rgb' : [],'flow' : [],'fusion' : []}}
+    accs = {'train' : {'rgb' : [],'flow' : [],'fusion' : []}, 
+                'val': {'rgb' : [],'flow' : [],'fusion' : []}}
+    epoch = 0
+    start = time.time()
+    prev_elapsed = 0
+    
+    best_model = {'epoch' : 0, 
+                  'state_dict' : None, 
+                  'train_loss' : float('inf'), 
+                  'val_loss' : float('inf')}
+    
+    # LOAD INTERMEDIATE STATE
+    if args.resume:
+        
+        print('\n********* RESUME TRAINING ***********', 
+              '\nLast Epoch =', save_content['train']['epoch'])
+        
+        assert(save_content['train']['epoch'] < args.epoch)
