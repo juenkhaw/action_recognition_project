@@ -1,4 +1,8 @@
-# R(2+1)D Action Recognition Network with Weighted Fusion Network (Refactor Ongoing)
+# R(2+1)D Action Recognition Network with Weighted Fusion Network
+
+**Results are outdated from latest implementations on fusion network**
+
+R2P1D-18 trained from scratch
 
 ![Shaving_beard_sample](https://github.com/juenkhaw/action_recognition_project/blob/master/demo_result/v_ShavingBeard_g04_c04.png)
 ![Surfing_sample](https://github.com/juenkhaw/action_recognition_project/blob/master/demo_result/v_Surfing_g04_c01.png)
@@ -7,43 +11,44 @@
 
 ### Running
 
-Please run on `init.py` with one of the arguments set provided below:
+`stream_init.py` for training the stream networks from scratch or pre-trained models
+`fusion_init.py` for training the fusion network (except for averaging) with pre-trained stream networks models
 
-**Training from scratch on fusion network with pretrained stream networks**
+**Typical Configurations**
 
-The pretrained stream network model packages are expected to be put in the same folder as the script.
+The pretrained stream network model packages are assummed to be put in the same folder as the script.
 
-`ucf 2-stream [dataset_path] -fusion [fusion_method] -train -loadmodel [model_path]` -cl 8 -ld 18 -test -runalltest -dv gpu -save -savename [output_name] -v2 -mwfpretrain`
+**Training streams from scratch**
 
-**Continue training on previous model (two-stream)**
+`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -train [-meansub] -ep [epoch] -sbs [train-subbatch-size] -vsbs [validate-subbatch-size] -save -savename [output_name] -v2`
 
-`ucf 2-stream [dataset_path] -fusion [fusion_method] -train -loadmodel [model_path] -cl 8 -ld 18 -test -runalltest -dv gpu -save -savename [output_name] -v2`
+**Training streams with pre-trained models**
 
-**Training from scratch and testing with subbatches applied (two-stream)**
+`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -pretrain -loadmodel [model_path] -train [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
-`ucf 2-stream [dataset_path] -fusion [fusion_method] -train -loadmodel [model_path] -cl 8 -ld 18 -sbs [training_subbatch_size] -test -runalltest -stbs [testing_subbatch_size] -dv gpu -save -savename [output_name] -v2`
+**Continue training from previous half-trained models**
 
-**Evaluate on pre-trained model (testing only)**
+`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -loadmodel [model_path] -resume [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
-`ucf [2-stream/rgb/flow] [dataset_path] -fusion [fusion_method] -loadmodel [model_path] -cl 8 -ld 18 -test -runalltest -save -savename [output_name] -v2`
+**Testing streams**
 
-**Training from scratch (two-stream)**
+`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -loadmodel [model_path] [-meansub] -test -tbs [test-batch-size] -stbs [test-subbatch-size] -v2`
 
-`ucf 2-stream [dataset_path] -fusion [fusion_method] -train -cl 8 -ld 18 -test -runalltest -save -savename [output_name] -v2`
+**Training fusionnet from scratch**
 
-**Training from scratch (single-modality)**
+`[fusionnet]` indicates choice of fusion network architecture, `average` is only valid for testing.
 
-`ucf [2-stream/rgb/flow] [dataset_path] -train -cl 8 -ld 18 -test -runalltest -save -savename [output_name] -v2`
+`ucf [dataset_path] [fusionnet] pref -cl [8/16] -ld [18/34] -loadstream [rgb_model_path flow_model_path] -train [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
-**Test run on gpu**
+**Training fusionnet from previous half-trained models**
 
-`ucf [2-stream/rgb/flow] [dataset_path] -train -cl 8 -ld 18 -ep 5 -sbs 2 -test -runalltest -stbs 5 -tm -tc 32 -v2`
+`ucf [dataset_path] [fusionnet] pref -cl [8/16] -ld [18/34] -loadstream [rgb_model_path flow_model_path] -loadfusion [fusionnet_model_path] -resume [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
-**Test run on cpu**
+**Testing fusionnet**
 
-`ucf [2-stream/rgb/flow] [dataset_path] -dv cpu -train -cl 8 -ld 18 -ep 5 -sbs 2 -test -runalltest -stbs 5 -tm -tc 32 -v2`
+`ucf [dataset_path] [fusionnet] pref -cl [8/16] -ld [18/34] -loadstream [rgb_model_path flow_model_path] -loadfusion [fusionnet_model_path] -test [-meansub] -tbs [test-batch-size] -stbs [test-subbatch-size] -v2`
 
-### Dataset Path
+### Dataset Path (Outdated)
 
 Please input path to the directory containing the rgb frames and optical flows as `dataset_path` 
 
@@ -64,7 +69,7 @@ The directory of optical flows should contain `u` and `v` optical flows:
 **Dataset Source**
 https://github.com/feichtenhofer/twostreamfusion
 
-### Parallelism
+### Parallelism (Outdated)
 
 To be evaluated soon, just disable it (by not including `-parallel`) at current stage
 
@@ -76,7 +81,7 @@ If parallelism implementation is causing problems, please run it without `-paral
 - https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
 - https://pytorch.org/tutorials/beginner/former_torchies/parallelism_tutorial.html
 
-### Output
+### Output (Outdated)
 
 The output file should contain contents with structure as following if training and testing are done in one shot:
 <pre>
@@ -99,7 +104,7 @@ output.pth.tar
         |-test_elpased
 </pre>
 
-### Arguments
+### Arguments (Outdated)
 
 **Training**
 
