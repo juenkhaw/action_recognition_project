@@ -11,9 +11,9 @@ R2P1D-18 trained from scratch
 
 ### Running
 
-`stream_init.py` for training the stream networks from scratch or pre-trained models
+`init_stream.py` for training the stream networks from scratch or pre-trained models
 
-`fusion_init.py` for training the fusion network (except for averaging) with pre-trained stream networks models
+`init_fusion.py` for training the fusion network (except for averaging) with pre-trained stream networks models
 
 **Typical Configurations**
 
