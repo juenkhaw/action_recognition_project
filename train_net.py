@@ -11,6 +11,8 @@ import gc
 
 import torch
 
+save_interval = 5
+
 def memReport():
     for obj in gc.get_objects():
         if torch.is_tensor(obj):
@@ -80,6 +82,14 @@ def transform_state_dict(state_dict, to_cpu = True, device = None):
             state_dict[k] = v.cpu()
         else:
             state_dict[k] = v.to(device)
+            
+def mem_state(device = 0):
+    print('Allocated = %.2f MB\nCached = %.2f MB' % (torch.cuda.memory_allocated(device) / 1024 / 1024, 
+                                                     torch.cuda.memory_cached(device) / 1024 / 1024))
+    print('MAX Allocated = %.2f MB\nMAX Cached = %.2f MB\n' % (torch.cuda.max_memory_allocated(device) / 1024 / 1024, 
+                                                     torch.cuda.max_memory_cached(device) / 1024 / 1024))
+    torch.cuda.reset_max_memory_allocated(device)
+    torch.cuda.reset_max_memory_cached(device)
 
 def train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content):
     
@@ -92,7 +102,9 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     losses = {'train' : [], 'val': []}
     accs = {'train': [], 'val' : []}
     epoch = 0
+    actual_start = time.time()
     start = time.time()
+    actual_elapsed = 0
     prev_elapsed = 0
         
     # load the model state that is to be continued for training
@@ -110,8 +122,8 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         epoch = save_content['train']['epoch']
         losses = save_content['train']['losses']
         accs = save_content['train']['accuracy']
-        #start = time.time()
         prev_elapsed = save_content['train']['train_elapsed']
+        actaul_elapsed = save_content['train']['actual_elapsed']
         best_model = save_content['train']['best']
         
         best_model['state_dict'] = best_model['state_dict']
@@ -119,6 +131,8 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     for epoch in range(epoch, args.epoch):
         
         for phase in ['train', 'val']:
+            
+            torch.cuda.empty_cache()
             
             batch = 1
             total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
@@ -136,14 +150,26 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             # for each mini batch of dataset
             for inputs, labels in dataloaders[phase]:
                 
+                torch.cuda.empty_cache()
+                
                 #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
                 print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
                 batch += 1
+                
+                ############
+#                print('BEFORE INPUT')
+#                mem_state()
+                ############
                 
                 # place the input and label into memory of gatherer unit
                 inputs = inputs.to(device)
                 labels = labels.long().to(device)
                 optimizer.zero_grad()
+                
+                ############
+#                print('AFTER INPUT')
+#                mem_state()
+                ############
         
                 # partioning each batch into subbatches to fit into memory
                 if phase == 'train':
@@ -152,8 +178,14 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     sub_inputs = [inputs]
                     sub_labels = [labels]
                 
-                del inputs
-                torch.cuda.empty_cache()
+                # NOT USEFUL
+#                del inputs
+#                torch.cuda.empty_cache()
+                
+                ############
+#                print('BEFORE', phase, epoch)
+#                mem_state()
+                ############
             
                 # with enabling gradient descent on parameters during training phase
                 with torch.set_grad_enabled(phase == 'train'):
@@ -162,7 +194,12 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     sb = 0
                 
                     for sb in range(len(sub_inputs)):
-                    
+                        
+                        torch.cuda.empty_cache()
+                        
+                        # this is where actual training starts
+                        actual_start = time.time()
+                            
                         output = model(sub_inputs[sb])
                         
                         if phase == 'train':
@@ -183,6 +220,10 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                         else:
                             # append the validation result until all subbatches are tested on
                             outputs = torch.cat((outputs, output['FC']))
+                            
+                                                
+                        # this is where actual training ends
+                        actual_elapsed += time.time() - actual_start
                         
                     # avearging over validation results and compute val loss
                     if phase == 'val':
@@ -195,6 +236,11 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     # update parameters
                     if phase == 'train':
                         optimizer.step()
+                        
+                ############
+#                print('AFTER', phase, epoch)
+#                mem_state()
+                ############
             
             # compute the loss and accuracy for the current batch
             epoch_loss = current_loss / len(dataloaders['train'].dataset)
@@ -226,12 +272,13 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             
         # time to save these poor guys
         # dun wanna losing them again
-        if (epoch + 1) % args.save_interval == 0 and args.save:
+        if (epoch + 1) % save_interval and args.save:
             
             save_training_model(args, 'train', save_content,  
                                     accuracy = accs,
                                     losses = losses,
                                     train_elapsed = time.time() - start,
+                                    actual_elapsed = actaul_elapsed,
                                     state_dict = model.state_dict(),
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
@@ -244,6 +291,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     if args.verbose2:
         print('\n\n+++++++++ TRAINING RESULT +++++++++++',
               '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
+              '\nActual Training Time = %d h %d m %d s' % (int(actual_elapsed//3600), int((actual_elapsed%3600)//60), int(actual_elapsed %60)),
               '\n+++++++++++++++++++++++++++++++++++++')
     #print(f"Training completein {int(time_elapsed//3600)}h {int((time_elapsed%3600)//60)}m {int(time_elapsed %60)}s")
     #print("Training completein %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
@@ -417,7 +465,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
             
         # time to save these poor guys
         # dun wanna losing them again
-        if (epoch + 1) % args.save_interval == 0 and args.save:
+        if (epoch + 1) % save_interval == 0 and args.save:
             
             save_training_model(args, 'train', save_content,  
                                     accuracy = accs,

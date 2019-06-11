@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import VideoDataset
 from network_r2p1d import R2Plus1DNet
 from test_net import test_stream
-from train_net import train_stream, save_training_model
+from train_net import train_stream, save_training_model, mem_state
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Stream Network')
 
@@ -24,12 +24,18 @@ parser.add_argument('dataset', help = 'video dataset to be trained and validated
 parser.add_argument('modality', help = 'modality to be trained and validated', choices = ['rgb', 'flow', '2-stream'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 
+# hyperparmeter settings
+parser.add_argument('-freeze', '--freeze_point', help = 'point where pretrained stream is froze up until', default = 'conv3_x', choices = ['conv' + str(i) + '_x' for i in range(1, 6)])
+parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
+parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
+parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
+
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
-parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 8, type = int)
+parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 16, type = int)
 parser.add_argument('-sp', '--split', help = 'dataset split selected in training and evaluating model', default = 1, choices = list(range(1, 4)), type = int)
-parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
-parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
+parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 34, choices = [18, 34], type = int)
+parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 50, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
 parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each training sub-batch', default = 8, type = int)
 parser.add_argument('-vsbs', '--val-subbatch-size', help = 'number of labelled sample for each validation sub-batch', default = 8, type = int)
@@ -55,7 +61,6 @@ parser.add_argument('-stbs', '--sub-test-batch-size', help = 'number of clips in
 
 # output settings
 parser.add_argument('-save', '--save', help = 'save model and accuracy', action = 'store_true', default = False)
-parser.add_argument('-saveintv', '--save-interval', help = 'save model after running N epochs', default = 5, type = int)
 parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -106,23 +111,25 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
 if args.load_model is not None:
             
     # SWITCH ACCORDING TO SITUATIONS =====================================
-    model_state = torch.load(args.load_model)['train']
+    model_state = torch.load(args.load_model)
     #model_state = torch.load(args.load_model)['train']['best']
     #model_state = torch.load(args.load_model)['train']['best']
     
     # load the state model into the network
     if args.resume or args.train:
-        model.load_state_dict(model_state['state_dict'], strict = False)
-        # migrate the other content
-        save_content['train'] = model_state
+        model.load_state_dict(model_state['train']['state_dict'], strict = False)
+        # migrate the other content when loading a half-trained model
+        if args.resume:
+            save_content['train'] = model_state
     
     else:
-        model.load_state_dict(model_state['best']['state_dict'], strict = False)
+        model.load_state_dict(model_state['train']['best']['state_dict'], strict = False)
     
     # freeze part of the model if it is a pretrained model
     if args.pretrain and (args.train or args.resume):
-        model.freeze('conv3_x')
-        
+        model.freeze(args.freeze_point)
+    
+    # COULD NOT DEALLOCATE TENSOR
     del model_state
     torch.cuda.empty_cache()
     
@@ -156,7 +163,7 @@ try:
         
         # define criterion, optimizer and scheduler
         criterion = nn.CrossEntropyLoss()
-        optimizer = optim.SGD(model.parameters(), lr = 1e-2, momentum = 0.5)
+        optimizer = optim.SGD(model.parameters(), lr = args.lr, momentum = args.momentum, weight_decay = args.l2wd)
         #optimizer = optim.RMSprop(model.parameters(), lr = 1e-2, alpha = 0.99)
         # trying on dynamic scheduler
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience = 10, threshold = 1e-3, min_lr = 1e-6)
@@ -172,6 +179,9 @@ try:
                 batch_size = args.val_subbatch_size, shuffle = False)
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
+        
+        # SOME MEMORY FREED OUT HERE
+        torch.cuda.empty_cache()
         
         if args.verbose2:
             print('Training Set =', len(train_dataloader.dataset), 
