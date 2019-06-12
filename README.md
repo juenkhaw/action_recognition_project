@@ -19,17 +19,20 @@ R2P1D-18 trained from scratch
 
 The pretrained stream network model packages are assummed to be put in the same folder as the script.
 
+**General stream_init arguments**
+`ucf [rgb/flow] ../dataset/UCF-101 -cl [8/16] -ld [18/34] [-pretrain] -loadmodel [kinetic-pretrained] -freeze [conv3_x] -lr [1e-2] -momentum [0.1] -l2wd [1e-2] -train [-resume] -ep [] -sbs [] -vsbs [] [-meansub] -test -tbs [] -stbs[] -v2 -save -savename[]`
+
 **Training streams from scratch**
 
-`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -train [-meansub] -ep [epoch] -sbs [train-subbatch-size] -vsbs [validate-subbatch-size] -save -savename [output_name] -v2`
+`ucf [rgb/flow] [dataset_path] -train [-meansub] -ep [epoch] -sbs [train-subbatch-size] -vsbs [validate-subbatch-size] -save -savename [output_name] -v2`
 
 **Training streams with pre-trained models**
 
-`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -pretrain -loadmodel [model_path] -train [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
+`ucf [rgb/flow] [dataset_path] -pretrain -loadmodel [model_path] -train [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
 **Continue training from previous half-trained models**
 
-`ucf [rgb/flow] [dataset_path] -cl [8/16] -ld [18/34] -loadmodel [model_path] -resume [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
+`ucf [rgb/flow] [dataset_path] -pretrain -loadmodel [model_path] -resume [-meansub] -ep [epoch] -sbs [sub-batch-size] -vsbs [validate-sub-batch-size] -save -savename [output_name] -v2`
 
 **Testing streams**
 
