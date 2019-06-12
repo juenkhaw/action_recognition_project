@@ -20,6 +20,7 @@ R2P1D-18 trained from scratch
 The pretrained stream network model packages are assummed to be put in the same folder as the script.
 
 **General stream_init arguments**
+
 `ucf [rgb/flow] ../dataset/UCF-101 -cl [8/16] -ld [18/34] [-pretrain] -loadmodel [kinetic-pretrained] -freeze [conv3_x] -lr [1e-2] -momentum [0.1] -l2wd [1e-2] -train [-resume] -ep [] -sbs [] -vsbs [] [-meansub] -test -tbs [] -stbs[] -v2 -save -savename[]`
 
 **Training streams from scratch**
@@ -72,18 +73,6 @@ The directory of optical flows should contain `u` and `v` optical flows:
 
 **Dataset Source**
 https://github.com/feichtenhofer/twostreamfusion
-
-### Parallelism (Outdated)
-
-To be evaluated soon, just disable it (by not including `-parallel`) at current stage
-
-Turns out as suspect in causing machine to crash, pending to try on not setting host GPU `cuda:0` as the gatherer
-
-If parallelism implementation is causing problems, please run it without `-parallel` tag
-
-**References**
-- https://pytorch.org/tutorials/beginner/blitz/data_parallel_tutorial.html
-- https://pytorch.org/tutorials/beginner/former_torchies/parallelism_tutorial.html
 
 ### Output (Outdated)
 
