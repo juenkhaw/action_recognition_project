@@ -152,24 +152,14 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                 
                 torch.cuda.empty_cache()
                 
-                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
-                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
+                print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
+                #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
                 batch += 1
-                
-                ############
-#                print('BEFORE INPUT')
-#                mem_state()
-                ############
                 
                 # place the input and label into memory of gatherer unit
                 inputs = inputs.to(device)
                 labels = labels.long().to(device)
                 optimizer.zero_grad()
-                
-                ############
-#                print('AFTER INPUT')
-#                mem_state()
-                ############
         
                 # partioning each batch into subbatches to fit into memory
                 if phase == 'train':
@@ -177,15 +167,6 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                 else:
                     sub_inputs = [inputs]
                     sub_labels = [labels]
-                
-                # NOT USEFUL
-#                del inputs
-#                torch.cuda.empty_cache()
-                
-                ############
-#                print('BEFORE', phase, epoch)
-#                mem_state()
-                ############
             
                 # with enabling gradient descent on parameters during training phase
                 with torch.set_grad_enabled(phase == 'train'):
@@ -236,11 +217,6 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                     # update parameters
                     if phase == 'train':
                         optimizer.step()
-                        
-                ############
-#                print('AFTER', phase, epoch)
-#                mem_state()
-                ############
             
             # compute the loss and accuracy for the current batch
             epoch_loss = current_loss / len(dataloaders['train'].dataset)
@@ -278,7 +254,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                                     accuracy = accs,
                                     losses = losses,
                                     train_elapsed = time.time() - start,
-                                    actual_elapsed = actaul_elapsed,
+                                    actual_elapsed = actual_elapsed,
                                     state_dict = model.state_dict(),
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},

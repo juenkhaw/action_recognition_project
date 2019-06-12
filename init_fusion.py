@@ -25,7 +25,6 @@ parser.add_argument('dataset', help = 'video dataset to be trained and validated
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 parser.add_argument('fusion', help = 'Fusion method to be used', 
                     choices = ['average', 'vanilla-ld3', 'class-ld3', 'activation-ld3'])
-parser.add_argument('archi', help = 'architecture used on complying streams and fusion networks', choices = ['pref', 'e2e'])
 
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
@@ -40,8 +39,7 @@ parser.add_argument('-meansub', '--meansub', help = 'activates mean substraction
 
 # model state loading settings
 parser.add_argument('-loadstream', '--load-stream', help = 'paths to the pretrained stream model state_dict (rgb, flow)', nargs = '+', default = [], type = str)
-parser.add_argument('-loadfusion', '--load-fusion', help = 'path to the pretrained fusion network model state_dict (pref : fusion network only, e2e : streams + fusion network)', 
-                    nargs = '+', default = [], type = str)
+parser.add_argument('-loadfusion', '--load-fusion', help = 'path to the pretrained fusion network model state_dict', nargs = '+', default = [], type = str)
 parser.add_argument('-resume', '--resume', help = 'indicating this session is continuing training from last session', action = 'store_true', default = False)
 
 # debugging mode settings
@@ -73,7 +71,6 @@ assert(args.train or args.test or args.resume)
 # pretrained fusion is not legit for avearging fusion
 # and ensure that streams are preloaded with model state
 if args.fusion == 'average':
-    assert(args.archi == 'pref')
     assert(not args.train)
     assert(len(args.load_stream) == 2)
     
@@ -109,10 +106,6 @@ stream_endp = {'average' : ['SCORES'],
 # intialize save content
 save_content = {}
 save_content['args'] = args
-
-# ensure there are stream models input if training mode is set to pretrained streams
-if args.archi == 'pref':
-    assert(len(args.load_stream) == 2)
     
 print('\n********* LOADING MODEL ***********', 
           '\nStream State Path =', args.load_stream, 
@@ -134,59 +127,39 @@ fusionnet = FusionNet(fusion = args.fusion).to(device)
 # FOR TESTING ONLY
 if args.load_stream is not [] or args.load_fusion is not []:
         
-    print('Fusion Mode =', 'End to End' if args.archi == 'e2e' else 'Pretrained Streams')
+    print('Fusion Mode =', 'Frozen Streams')
     
     # validation on number of model passed in
-    if args.archi == 'pref':
         
-        assert(len(args.load_stream) == 2)
+    assert(len(args.load_stream) == 2)
 #        if args.fusion != 'average':
 #            assert(len(args.load_fusion) == 1)
-        
-        rgb_state = torch.load(args.load_stream[0])['train']['best']['state_dict']
-        flow_state = torch.load(args.load_stream[1])['train']['best']['state_dict']
+    
+    rgb_state = torch.load(args.load_stream[0])['train']['best']['state_dict']
+    flow_state = torch.load(args.load_stream[1])['train']['best']['state_dict']
 #        rgb_state = torch.load(args.load_stream[0])['train']['best']['model_state']
 #        flow_state = torch.load(args.load_stream[1])['train']['best']['model_state']
-        
-        rgbnet.load_state_dict(rgb_state)
-        flownet.load_state_dict(flow_state)
-        
-        del rgb_state
-        del flow_state
-        
-        if args.fusion != 'average' and len(args.load_fusion) > 0:
-            
-            if args.resume or args.train:
-                fusion_state = torch.load(args.load_fusion[0])['train']
-                save_content['train'] = fusion_state
-            else:
-                fusion_state = torch.load(args.load_fusion[0])['train']['best']
-                
-            fusionnet.load_state_dict(fusion_state['state_dict'])
-            
-            del fusion_state
-            
-        torch.cuda.empty_cache()
-        
-    elif args.archi == 'e2e':
-        assert(len(args.load_fusion) == 1)
-        
-        state = torch.load(args.load_fusion[0])['train']
+    
+    rgbnet.load_state_dict(rgb_state)
+    flownet.load_state_dict(flow_state)
+    
+    del rgb_state
+    del flow_state
+    
+    if args.fusion != 'average' and len(args.load_fusion) > 0:
         
         if args.resume or args.train:
-            rgbnet.load_state_dict(state['state_dict']['rgb'])
-            flownet.load_state_dict(state['state_dict']['flow'])
-            fusionnet.load_state_dict(state['state_dict']['fusion'])
-            save_content['train'] = state
-            
+            fusion_state = torch.load(args.load_fusion[0])['train']
+            save_content['train'] = fusion_state
         else:
-            rgbnet.load_state_dict(state['best']['state_dict']['rgb'])
-            flownet.load_state_dict(state['best']['state_dict']['flow'])
-            fusionnet.load_state_dict(state['best']['state_dict']['fusion'])
+            fusion_state = torch.load(args.load_fusion[0])['train']['best']
+            
+        fusionnet.load_state_dict(fusion_state['state_dict'])
         
-        del state
-        torch.cuda.empty_cache()
-    
+        del fusion_state
+        
+    torch.cuda.empty_cache()
+        
     print('************* LOADED **************')
     
 try:    
@@ -218,13 +191,6 @@ try:
         # define criterion, optimizer and scheduler
         criterion = nn.CrossEntropyLoss()
         
-        if args.archi == 'e2e':
-            rgb_optimizer = optim.SGD(rgbnet.parameters(), lr = 1e-2, momentum = 0.5)
-            flow_optimizer = optim.SGD(flownet.parameters(), lr = 1e-2, momentum = 0.5)
-            
-            rgb_scheduler = optim.lr_scheduler.ReduceLROnPlateau(rgb_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
-            flow_scheduler = optim.lr_scheduler.ReduceLROnPlateau(flow_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-6)
-        
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
             fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2, momentum = 0.1)
@@ -248,31 +214,20 @@ try:
                   '\n***********************************')
             
         # train
-        if args.archi == 'pref':
-            losses, accs, train_elapsed, best_model = train_pref_fusion(args, device, 
-                                                            {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
-                                                            dataloaders, fusion_optimizer, criterion, 
-                                                            fusion_scheduler, save_content)
-#        elif args.train_option == 'pref':
-#            losses, accs, train_elapsed = train_fusion(args, device, 
-#                                                   {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
-#                                                   dataloaders, 
-#                                                   {'fusion':fusion_optimizer}, 
-#                                                   criterion, 
-#                                                   {'fusion':fusion_scheduler}, 
-#                                                   save_content)
+        train_pref_fusion(args, device, {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
+                          dataloaders, fusion_optimizer, criterion, fusion_scheduler, save_content)
         
-        if args.save:
-            save_training_model(args, 'train', save_content,  
-                                    accuracy = accs,
-                                    losses = losses,
-                                    train_elapsed = train_elapsed,
-                                    state_dict = fusionnet.state_dict(),
-                                    opt_dict = fusion_optimizer.state_dict(),
-                                    sch_dict = fusion_scheduler.state_dict() if fusion_scheduler is not None else {},
-                                    epoch = args.epoch,
-                                    best = best_model
-                                    )
+#        if args.save:
+#            save_training_model(args, 'train', save_content,  
+#                                    accuracy = accs,
+#                                    losses = losses,
+#                                    train_elapsed = train_elapsed,
+#                                    state_dict = fusionnet.state_dict(),
+#                                    opt_dict = fusion_optimizer.state_dict(),
+#                                    sch_dict = fusion_scheduler.state_dict() if fusion_scheduler is not None else {},
+#                                    epoch = args.epoch,
+#                                    best = best_model
+#                                    )
     # execute testing
     if args.test:
         
@@ -295,13 +250,13 @@ try:
         all_scores, test_acc, test_elapsed = test_pref_fusion(args, device, 
                                                               {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
                                                               test_dataloader)
-#        
-#        if args.save:
-#            save_training_model(args, 'test', save_content, 
-#                                    scores = all_scores,
-#                                    accuracy = test_acc,
-#                                    test_elapsed = test_elapsed
-#                                    )
+        
+        if args.save:
+            save_training_model(args, 'test', save_content, 
+                                    scores = all_scores,
+                                    accuracy = test_acc,
+                                    test_elapsed = test_elapsed
+                                    )
 except Exception:
     print(traceback.format_exc())
     

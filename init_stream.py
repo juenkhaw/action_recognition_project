@@ -24,7 +24,7 @@ parser.add_argument('dataset', help = 'video dataset to be trained and validated
 parser.add_argument('modality', help = 'modality to be trained and validated', choices = ['rgb', 'flow', '2-stream'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 
-# hyperparmeter settings
+# hyperparmeter settings, according to priorities
 parser.add_argument('-freeze', '--freeze_point', help = 'point where pretrained stream is froze up until', default = 'conv3_x', choices = ['conv' + str(i) + '_x' for i in range(1, 6)])
 parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
@@ -111,19 +111,19 @@ model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], de
 if args.load_model is not None:
             
     # SWITCH ACCORDING TO SITUATIONS =====================================
-    model_state = torch.load(args.load_model)
+    model_state = torch.load(args.load_model, map_location = device)['train']
     #model_state = torch.load(args.load_model)['train']['best']
     #model_state = torch.load(args.load_model)['train']['best']
     
     # load the state model into the network
     if args.resume or args.train:
-        model.load_state_dict(model_state['train']['state_dict'], strict = False)
+        model.load_state_dict(model_state['state_dict'], strict = False)
         # migrate the other content when loading a half-trained model
         if args.resume:
             save_content['train'] = model_state
     
     else:
-        model.load_state_dict(model_state['train']['best']['state_dict'], strict = False)
+        model.load_state_dict(model_state['best']['state_dict'], strict = False)
     
     # freeze part of the model if it is a pretrained model
     if args.pretrain and (args.train or args.resume):
@@ -189,19 +189,8 @@ try:
                   '\n***********************************')
             
         # train
-        losses, accs, train_elapsed, best_model = train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content)
-        
-        if args.save:
-            save_training_model(args, 'train', save_content,  
-                                    accuracy = accs,
-                                    losses = losses,
-                                    train_elapsed = train_elapsed,
-                                    state_dict = model.state_dict(),
-                                    opt_dict = optimizer.state_dict(),
-                                    sch_dict = scheduler.state_dict() if scheduler is not None else {},
-                                    epoch = args.epoch,
-                                    best = best_model
-                                    )
+        train_stream(args, device, model, dataloaders, optimizer, criterion, scheduler, save_content)
+
     # execute testing
     if args.test:
         
