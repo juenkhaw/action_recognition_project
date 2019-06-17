@@ -24,7 +24,7 @@ parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 parser.add_argument('fusion', help = 'Fusion method to be used', 
-                    choices = ['average', 'vanilla-ld3', 'class-ld3', 'activation-ld3'])
+                    choices = ['average', 'vanilla-ld3', 'class-ld3', 'vanilla-ld3-2', 'class-ld3-2', 'activation-ld3'])
 
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
@@ -99,7 +99,9 @@ num_classes = {'ucf' : 101, 'hmdb' : 51}
 in_channels = {'rgb' : 3, 'flow' : 2}
 stream_endp = {'average' : ['SCORES'], 
                'vanilla-ld3' : ['AP', 'FC'], 
+               'vanilla-ld3-2' : ['AP', 'FC'], 
                'class-ld3' : ['AP', 'FC'], 
+               'class-ld3-2' : ['AP', 'FC'], 
                'activation-ld3' : ['AP']
                }
 

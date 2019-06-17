@@ -7,6 +7,8 @@ Created on Sun Feb 24 15:56:16 2019
 import torch
 import torch.nn as nn
 
+from network_r2p1d import R2Plus1DNet
+
 gpu_name = 'cuda:0'
     
 class FusionNet(nn.Module):
@@ -148,12 +150,52 @@ class FusionNet(nn.Module):
     def freezeAll(self, unfreeze = False):
         for params in self.parameters():
             params.requires_grad = unfreeze
+            
+            
+class E2EFusionNet(nn.Module):
+    
+    def __init__(self, device, rgbnet, flownet, fusionnet, 
+                 bn_momentum = 0.1, bn_epson = 1e-3, verbose = False):
+        
+        super(E2EFusionNet, self).__init__()
+        
+        self.rgbnet = rgbnet
+        self.flownet = flownet
+        self.fusionnet = fusionnet
+        
+    def forward(self, x_rgb, x_flow):
+        
+        rgb_ap = self.rgbnet(x_rgb)
+        flow_ap = self.flownet(x_flow)
+        
+        fusion_out = self.fusionnet(rgb_ap, flow_ap)
+        
+        if self.fusionnet._fusion in ['vanilla-ld3', 'vanilla-ld3-2', 'class-ld3', 'class-ld3-2']:
+            return rgb_ap['FC'], flow_ap['FC'], fusion_out
+        else:
+            return fusion_out
+            
+        def freezeAll(self, unfreeze = False):
+            for params in self.parameters():
+                params.requires_grad = unfreeze
         
 if __name__ is '__main__':
+    from train_net import mem_state
     device = torch.device('cuda:0')
-    model = FusionNet(fusion = 'class-ld3-2', endpoint=['FC', 'SCORES']).to(device)
+    rgb = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=3, endpoint=['AP', 'FC']).to(device)
+    flow = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=2, endpoint=['AP', 'FC']).to(device)
+    fusion = FusionNet(fusion = 'class-ld3-2', endpoint=['FC']).to(device)
     
-    x1 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
-    x2 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
+    model = E2EFusionNet(device, rgb, flow, fusion)
+    model.eval()
     
-    s = model(x1, x2)
+    x1 = torch.randn((1, 3, 8, 112, 112)).to(device)
+    x2 = torch.randn((1, 2, 8, 112, 112)).to(device)
+    
+    with torch.set_grad_enabled(False):
+        s = model(x1, x2)
+    
+#    x1 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
+#    x2 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
+#    model = FusionNet(fusion = 'class-ld3-2', endpoint=['FC']).to(device) 
+#    s = model(x1, x2)

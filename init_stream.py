@@ -194,6 +194,8 @@ try:
     # execute testing
     if args.test:
         
+        torch.cuda.empty_cache()
+        
         if args.verbose2:
             print('\n************ TESTING **************', 
                   '\nDataset =', args.dataset, '\nModality =', args.modality,
