@@ -163,6 +163,8 @@ def test_pref_fusion(args, device, models, test_dataloader):
             sb = 0
             
             for sb in range(len(sub_rgbX)):
+                
+                torch.cuda.empty_cache()
 
                 rgb_out = models['rgb'](sub_rgbX[sb])
                 flow_out = models['flow'](sub_flowX[sb])

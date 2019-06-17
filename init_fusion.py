@@ -15,7 +15,7 @@ from torch.utils.data import DataLoader
 from dataset import TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
 from fusion_network import FusionNet
-from train_net import train_pref_fusion, save_training_model
+from train_net import train_pref_fusion, save_training_model, mem_state
 from test_net import test_pref_fusion
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
@@ -26,12 +26,16 @@ parser.add_argument('dataset_path', help = 'path link to the directory where rgb
 parser.add_argument('fusion', help = 'Fusion method to be used', 
                     choices = ['average', 'vanilla-ld3', 'class-ld3', 'vanilla-ld3-2', 'class-ld3-2', 'activation-ld3'])
 
+parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
+parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
+parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
+
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
-parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 8, type = int)
+parser.add_argument('-cl', '--clip-length', help = 'initial temporal length of each video training input', default = 16, type = int)
 parser.add_argument('-sp', '--split', help = 'dataset split selected in training and evaluating model', default = 1, choices = list(range(1, 4)), type = int)
-parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 18, choices = [18, 34], type = int)
-parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 45, type = int)
+parser.add_argument('-ld', '--layer-depth', help = 'depth of the resnet', default = 34, choices = [18, 34], type = int)
+parser.add_argument('-ep', '--epoch', help = 'number of epochs for training process', default = 50, type = int)
 parser.add_argument('-bs', '--batch-size', help = 'number of labelled sample for each batch', default = 32, type = int)
 parser.add_argument('-sbs', '--subbatch-size', help = 'number of labelled sample for each sub-batch', default = 8, type = int)
 parser.add_argument('-vsbs', '--val-subbatch-size', help = 'number of labelled sample for each validation sub-batch', default = 8, type = int)
@@ -57,7 +61,6 @@ parser.add_argument('-stbs', '--sub-test-batch-size', help = 'number of clips in
 
 # output settings
 parser.add_argument('-save', '--save', help = 'save model and accuracy', action = 'store_true', default = False)
-parser.add_argument('-saveintv', '--save-interval', help = 'save model after running N epochs', default = 5, type = int)
 parser.add_argument('-savename', '--savename', help = 'name of the output file', default = 'save', type = str)
 parser.add_argument('-v1', '--verbose1', help = 'activate to allow reporting of activation shape after each forward propagation', action = 'store_true', default = False)
 parser.add_argument('-v2', '--verbose2', help = 'activate to allow printing of loss and accuracy after each epoch', action = 'store_true', default = False)
@@ -67,12 +70,12 @@ args = parser.parse_args()
 print('******* ARGUMENTS *******', args ,'\n*************************\n')
 
 assert(args.train or args.test or args.resume)
+assert(len(args.load_stream) == 2)
 
 # pretrained fusion is not legit for avearging fusion
 # and ensure that streams are preloaded with model state
 if args.fusion == 'average':
     assert(not args.train)
-    assert(len(args.load_stream) == 2)
     
 # arguments on debugging mode arguments
 if args.test_mode == 'peek':
@@ -181,7 +184,7 @@ try:
         rgbnet = nn.DataParallel(rgbnet, [int(i[len(i) - 1]) for i in all_gpu], gpu_name[len(gpu_name) - 1])
         flownet = nn.DataParallel(flownet, [int(i[len(i) - 1]) for i in all_gpu], gpu_name[len(gpu_name) - 1])
         fusionnet = nn.DataParallel(fusionnet, [int(i[len(i) - 1]) for i in all_gpu], gpu_name[len(gpu_name) - 1])
-    
+     
     # execute training
     if args.train or args.resume:
         
@@ -195,7 +198,7 @@ try:
         
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
-            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = 1e-2, momentum = 0.1)
+            fusion_optimizer = optim.SGD(fusionnet.parameters(), lr = args.lr, momentum = args.momentum, weight_decay = args.l2wd)
             fusion_scheduler = optim.lr_scheduler.ReduceLROnPlateau(fusion_optimizer, patience = 10, threshold = 1e-4, min_lr = 1e-7)
             
         # preparing the training and validation dataset
@@ -210,6 +213,7 @@ try:
                 
         dataloaders = {'train': train_dataloader, 'val': val_dataloader}
         
+        torch.cuda.empty_cache()
         if args.verbose2:
             print('Training Set =', len(train_dataloader.dataset), 
                   '\nValidation Set =', len(val_dataloader.dataset),
@@ -219,20 +223,12 @@ try:
         train_pref_fusion(args, device, {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
                           dataloaders, fusion_optimizer, criterion, fusion_scheduler, save_content)
         
-#        if args.save:
-#            save_training_model(args, 'train', save_content,  
-#                                    accuracy = accs,
-#                                    losses = losses,
-#                                    train_elapsed = train_elapsed,
-#                                    state_dict = fusionnet.state_dict(),
-#                                    opt_dict = fusion_optimizer.state_dict(),
-#                                    sch_dict = fusion_scheduler.state_dict() if fusion_scheduler is not None else {},
-#                                    epoch = args.epoch,
-#                                    best = best_model
-#                                    )
+    mem_state(0)
+        
     # execute testing
     if args.test:
         
+        torch.cuda.empty_cache()
         if args.verbose2:
             print('\n************ TESTING **************', 
                   '\nDataset =', args.dataset, '\nFusion =', args.fusion,
@@ -259,6 +255,8 @@ try:
                                     accuracy = test_acc,
                                     test_elapsed = test_elapsed
                                     )
+    mem_state(0)
+    
 except Exception:
     print(traceback.format_exc())
     

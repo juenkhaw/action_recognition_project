@@ -284,7 +284,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
     epoch = 0
     start = time.time()
     prev_elapsed = 0
-    
+    actual_elapsed = 0
     best_model = {'epoch' : 0, 
                   'state_dict' : None, 
                   'train_loss' : float('inf'), 
@@ -305,12 +305,9 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
         epoch = save_content['train']['epoch']
         losses = save_content['train']['losses']
         accs = save_content['train']['accuracy']
-        #start = time.time()
+        actaul_elapsed = save_content['train']['actual_elapsed']
         prev_elapsed = save_content['train']['train_elapsed']
         best_model = save_content['train']['best']
-        #best_model['val_loss'] = content['best']['val_loss']
-        
-        #model.freeze('conv3_x')
     
     # freeze the streams for all the time
     models['rgb'].freezeAll()
@@ -324,6 +321,8 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
     for epoch in range(epoch, args.epoch):
         
         for phase in ['train', 'val']:
+            
+            torch.cuda.empty_cache()
             
             batch = 1
             total_batch = int(ceil(len(dataloaders[phase].dataset) / subbatch_count[phase]))
@@ -339,6 +338,8 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                 
             # for each mini batch of dataset
             for rgbX, flowX, labels in dataloaders[phase]:
+                
+                torch.cuda.empty_cache()
                 
                 #print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\r')
                 print('Phase', phase, '| Current batch', str(batch), '/', str(total_batch), end = '\n')
@@ -376,6 +377,9 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                         
                         torch.cuda.empty_cache()
                         
+                        # this is where actual training starts
+                        actual_start = time.time()
+                        
                         rgb_out = models['rgb'](sub_rgbX[sb])
                         flow_out = models['flow'](sub_flowX[sb])
                         fusion_out = models['fusion'](rgb_out, flow_out)
@@ -398,6 +402,9 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                         else:
                             # append the validation result until all subbatches are tested on
                             outputs = torch.cat((outputs, fusion_out['FC']))
+                            
+                        # this is where actual training ends
+                        actual_elapsed += time.time() - actual_start
                     
                 # avearging over validation results and compute val loss
                 if phase == 'val':
@@ -413,8 +420,8 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
             # compute the loss and accuracy for the current batch
             lr = {}
 
-            epoch_loss = current_loss / len(dataloaders['train'].dataset)
-            epoch_acc = float(current_correct) / len(dataloaders['train'].dataset)
+            epoch_loss = current_loss / len(dataloaders[phase].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
             
             losses[phase].append(epoch_loss)
             accs[phase].append(epoch_acc)
@@ -447,6 +454,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                                     accuracy = accs,
                                     losses = losses,
                                     train_elapsed = time.time() - start,
+                                    actual_elapsed = actual_elapsed,
                                     state_dict = models['fusion'].state_dict(),
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
@@ -459,6 +467,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
     if args.verbose2:
         print('\n\n+++++++++ TRAINING RESULT +++++++++++',
               '\nElapsed Time = %d h %d m %d s' % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)), 
+              '\nActual Training Time = %d h %d m %d s' % (int(actual_elapsed//3600), int((actual_elapsed%3600)//60), int(actual_elapsed %60)),
               '\n+++++++++++++++++++++++++++++++++++++')
         
     return losses, accs, time_elapsed, best_model

@@ -293,17 +293,17 @@ def transpose_clip_buffer(buffer):
             
     
 if __name__ == '__main__':
-    #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
-    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
-    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
-    #buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=False)
+    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
+    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
+    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
+    #buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
+    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=False)
     #buffer = transpose_video_buffer(buffer)
     buffer = transpose_clip_buffer(buffer)
-    buffer0 = buffer[3, :, :, 0]
-    buffer1 = buffer[3, :, :, 1]
+    buffer0 = buffer[3, :, :, :]
+    #buffer1 = buffer[3, :, :, 1]
     #buffer0 = cv2.cvtColor(buffer0, cv2.COLOR_RGB2BGR)
     cv2.imshow('buffer0', buffer0)
-    cv2.imshow('buffer1', buffer1)
+    #cv2.imshow('buffer1', buffer1)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
