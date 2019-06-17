@@ -219,8 +219,8 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
                         optimizer.step()
             
             # compute the loss and accuracy for the current batch
-            epoch_loss = current_loss / len(dataloaders['train'].dataset)
-            epoch_acc = float(current_correct) / len(dataloaders['train'].dataset)
+            epoch_loss = current_loss / len(dataloaders[phase].dataset)
+            epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
             
             losses[phase].append(epoch_loss)
             accs[phase].append(epoch_acc)

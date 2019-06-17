@@ -25,7 +25,7 @@ parser.add_argument('modality', help = 'modality to be trained and validated', c
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 
 # hyperparmeter settings, according to priorities
-parser.add_argument('-freeze', '--freeze_point', help = 'point where pretrained stream is froze up until', default = 'conv3_x', choices = ['conv' + str(i) + '_x' for i in range(1, 6)])
+parser.add_argument('-freeze', '--freeze_point', help = 'point where pretrained stream is froze up until', default = 'conv3_x', choices = ['conv' + str(i) + '_x' for i in range(1, 6)] + ['none'])
 parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
 parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
@@ -126,7 +126,7 @@ if args.load_model is not None:
         model.load_state_dict(model_state['best']['state_dict'], strict = False)
     
     # freeze part of the model if it is a pretrained model
-    if args.pretrain and (args.train or args.resume):
+    if args.pretrain and (args.train or args.resume) and args.freeze_point != 'none':
         model.freeze(args.freeze_point)
     
     # COULD NOT DEALLOCATE TENSOR
