@@ -11,3 +11,5 @@ untitled0.py
 *.png
 blobs.txt
 r2p1d_pretrained/run.txt
+split_check.py
+test_cuda.py

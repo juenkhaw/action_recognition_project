@@ -108,6 +108,7 @@ def test_stream(args, device, model, test_dataloader):
 def test_pref_fusion(args, device, models, test_dataloader):
     
     all_scores = []
+    all_weights = []
     test_correct = {'top-1' : 0, 'top-5' : 0}
     test_acc = {'top-1' : 0, 'top-5' : 0}
     
@@ -160,6 +161,7 @@ def test_pref_fusion(args, device, models, test_dataloader):
         with torch.set_grad_enabled(False):
             
             outputs = torch.tensor([], dtype = torch.float).to(device)
+            weights = torch.tensor([], dtype = torch.float).to(device)
             sb = 0
             
             for sb in range(len(sub_rgbX)):
@@ -170,18 +172,23 @@ def test_pref_fusion(args, device, models, test_dataloader):
                 flow_out = models['flow'](sub_flowX[sb])
                 fusion_out = models['fusion'](rgb_out, flow_out)
                 outputs = torch.cat((outputs, fusion_out['SCORES']))
+                weights = torch.cat((weights, fusion_out['WEIGHTS']))
         
         # detach the predicted scores         
         outputs = outputs.cpu().detach().numpy()
+        weights = weights.cpu().detach().numpy()
             
         # average the scores for each classes across all clips that belong to the same video
         averaged_score = np.average(np.array(np.split(outputs, batch_size)), axis = 1)
+        averaged_weights = np.average(np.array(np.split(weights, batch_size)), axis = 1)
         
         # concet into all scores
-        if all_scores == []:
+        if all_scores == [] and all_weights == []:
             all_scores = averaged_score
+            all_weights = averaged_weights
         else:
             all_scores = np.concatenate((all_scores, averaged_score), axis = 0)
+            all_weights = np.concatenate((all_weights, averaged_weights), axis = 0)
         
         # retrieve the label index with the top-5 scores
         top_k_indices = np.argsort(averaged_score, axis = 1)[:, ::-1][:, :5]
@@ -205,4 +212,4 @@ def test_pref_fusion(args, device, models, test_dataloader):
     #print('\nTesting acc %.4f %.4f' % test_acc[0], test_acc[1])
     #print("Testing complete in %d h %d m %d s" % (int(time_elapsed//3600), int((time_elapsed%3600)//60), int(time_elapsed %60)))
     
-    return all_scores, test_acc, time_elapsed
+    return all_scores, all_weights, test_acc, time_elapsed

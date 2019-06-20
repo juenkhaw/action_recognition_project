@@ -29,6 +29,7 @@ parser.add_argument('fusion', help = 'Fusion method to be used',
 parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
 parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
+parser.add_argument('-wdloss', '--wdloss', help = 'Ratio applying weight diff loss', default = 0, type = float)
 
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
@@ -245,13 +246,14 @@ try:
                   '\n***********************************')
             
         # testing
-        all_scores, test_acc, test_elapsed = test_pref_fusion(args, device, 
-                                                              {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
-                                                              test_dataloader)
+        all_scores, all_weights, test_acc, test_elapsed = test_pref_fusion(args, device, 
+                                                                           {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
+                                                                           test_dataloader)
         
         if args.save:
             save_training_model(args, 'test', save_content, 
                                     scores = all_scores,
+                                    weights = all_weights, 
                                     accuracy = test_acc,
                                     test_elapsed = test_elapsed
                                     )

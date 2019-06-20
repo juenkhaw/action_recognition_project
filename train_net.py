@@ -10,8 +10,10 @@ from math import ceil
 import gc
 
 import torch
+import numpy as np
 
-save_interval = 5
+save_interval = 2
+weight_save_interval = 2
 
 def memReport():
     for obj in gc.get_objects():
@@ -274,6 +276,12 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
     
     return losses, accs, time_elapsed, best_model
 
+def diff_loss(fusion, device, w, margin = 0.2, epilson = 1e-8):
+    w = w.to(device)
+    a = torch.max(torch.tensor([epilson]).to(device), abs(w[:,0] - w[:,1]) - margin)
+    a = torch.pow(1 / abs(torch.log(a)), 2)
+    return torch.sum(a)
+
 def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, scheduler, save_content):
     
     subbatch_sizes = {'train' : args.subbatch_size, 'val' : args.val_subbatch_size}
@@ -289,6 +297,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                   'state_dict' : None, 
                   'train_loss' : float('inf'), 
                   'val_loss' : float('inf')}
+    all_weights = {}
     
     # LOAD INTERMEDIATE STATE
     if args.resume:
@@ -308,6 +317,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
         actaul_elapsed = save_content['train']['actual_elapsed']
         prev_elapsed = save_content['train']['train_elapsed']
         best_model = save_content['train']['best']
+        all_weights = save_content['train']['weights']
     
     # freeze the streams for all the time
     models['rgb'].freezeAll()
@@ -330,6 +340,7 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
             # reset the loss and accuracy
             current_loss = 0
             current_correct = 0
+            current_weights = []
             
             if phase == 'train':
                 models['fusion'].train()
@@ -392,6 +403,10 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                             
                             fusion_loss = criterion(fusion_out['FC'], sub_labels[sb])
                             
+                            if args.wdloss != 0:
+                                diff_l = (args.wdloss * diff_loss("", device, fusion_out['WEIGHTS']))
+                                fusion_loss += diff_l
+                            
                             # accumulate loss and true positive for the current subbatch
                             current_loss += fusion_loss.item() * sub_rgbX[sb].size(0)
                             current_correct += torch.sum(preds == sub_labels[sb].data)
@@ -403,6 +418,14 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                             # append the validation result until all subbatches are tested on
                             outputs = torch.cat((outputs, fusion_out['FC']))
                             
+                            # append the weights list
+                            if epoch % weight_save_interval == 0:
+                                weights = fusion_out['WEIGHTS'].cpu().detach().numpy()
+                                if current_weights == []:
+                                    current_weights = weights
+                                else:
+                                    current_weights = np.concatenate((current_weights, weights), axis = 0)
+                            
                         # this is where actual training ends
                         actual_elapsed += time.time() - actual_start
                     
@@ -413,6 +436,10 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                         
                     _, preds = torch.max(outputs, 1)
                     current_correct += torch.sum(preds == labels.data)
+                    
+                    # append the weights list
+                    if epoch % weight_save_interval == 0:
+                        all_weights[epoch + 1] = current_weights
                     
                 else: # update parameters when phase == train
                     optimizer.step()
@@ -459,7 +486,8 @@ def train_pref_fusion(args, device, models, dataloaders, optimizer, criterion, s
                                     opt_dict = optimizer.state_dict(),
                                     sch_dict = scheduler.state_dict() if scheduler is not None else {},
                                     epoch = epoch + 1,
-                                    best = best_model
+                                    best = best_model,
+                                    weights = all_weights
                                     )
             
     # display the time elapsed
