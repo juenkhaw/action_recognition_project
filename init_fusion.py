@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 
 from dataset import TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
-from fusion_network import FusionNet
-from train_net import train_pref_fusion, save_training_model, mem_state
+from fusion_network import FusionNet, RelNet
+from train_net import train_pref_fusion, train_relnet, save_training_model, mem_state
 from test_net import test_pref_fusion
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
@@ -24,7 +24,8 @@ parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 parser.add_argument('dataset', help = 'video dataset to be trained and validated', choices = ['ucf', 'hmdb'])
 parser.add_argument('dataset_path', help = 'path link to the directory where rgb_frames and optical flows located')
 parser.add_argument('fusion', help = 'Fusion method to be used', 
-                    choices = ['average', 'vanilla-ld3', 'class-ld3', 'vanilla-ld3-2', 'class-ld3-2', 'activation-ld3'])
+                    choices = ['average', 'vanilla-ld3', 'class-ld3', 'vanilla-ld3-2', 'class-ld3-2', 'activation-ld3', 
+                               'rel-vanilla'])
 
 parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
@@ -106,8 +107,13 @@ stream_endp = {'average' : ['SCORES'],
                'vanilla-ld3-2' : ['AP', 'FC'], 
                'class-ld3' : ['AP', 'FC'], 
                'class-ld3-2' : ['AP', 'FC'], 
-               'activation-ld3' : ['AP']
+               'activation-ld3' : ['AP'], 
+               'rel-vanilla' : ['AP', 'FC']
                }
+# FOR RELNET ONLY
+is_relnet = 'rel' in args.fusion
+if is_relnet:
+    relnet_type = args.fusion.split('-')[1]
 
 # intialize save content
 save_content = {}
@@ -127,7 +133,10 @@ rgbnet = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], d
 flownet = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                                 in_channels = in_channels['flow'], verbose = args.verbose1, 
                                 bn_momentum = 0.1, bn_epson = 1e-3, endpoint = stream_endp[args.fusion]).to(device)
-fusionnet = FusionNet(fusion = args.fusion).to(device)
+if not is_relnet:
+    fusionnet = FusionNet(fusion = args.fusion).to(device)
+else:
+    fusionnet = RelNet(net = args.fusion).to(device)
 
 # load the stream network model state that is completed training
 # FOR TESTING ONLY
@@ -141,8 +150,8 @@ if args.load_stream is not [] or args.load_fusion is not []:
 #        if args.fusion != 'average':
 #            assert(len(args.load_fusion) == 1)
     
-    rgb_state = torch.load(args.load_stream[0])['train']['best']['state_dict']
-    flow_state = torch.load(args.load_stream[1])['train']['best']['state_dict']
+    rgb_state = torch.load(args.load_stream[0], map_location = {'cuda:3': gpu_name})['train']['best']['state_dict']
+    flow_state = torch.load(args.load_stream[1], map_location = {'cuda:3': gpu_name})['train']['best']['state_dict']
 #        rgb_state = torch.load(args.load_stream[0])['train']['best']['model_state']
 #        flow_state = torch.load(args.load_stream[1])['train']['best']['model_state']
     
@@ -195,7 +204,10 @@ try:
                   '\nSplit =', args.split)
         
         # define criterion, optimizer and scheduler
-        criterion = nn.CrossEntropyLoss()
+        if not is_relnet:
+            criterion = nn.CrossEntropyLoss()
+        else:
+            criterion = {'fusion':nn.CrossEntropyLoss(), 'relnet':nn.MSELoss()}
         
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)
@@ -221,7 +233,11 @@ try:
                   '\n***********************************')
             
         # train
-        train_pref_fusion(args, device, {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
+        if not is_relnet: 
+            train_func = train_pref_fusion
+        else:
+            train_func = train_relnet
+        train_func(args, device, {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
                           dataloaders, fusion_optimizer, criterion, fusion_scheduler, save_content)
         
     mem_state(0)

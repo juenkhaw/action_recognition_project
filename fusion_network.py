@@ -107,8 +107,6 @@ class FusionNet(nn.Module):
             
             ratio_out = self.relu(self.bn1(self.linear1(ratio_out)))
             ratio_out = self.relu(self.bn2(self.linear2(ratio_out)))
-#                    ratio_out = self.relu(self.linear1(ratio_out))
-#                    ratio_out = self.relu(self.linear2(ratio_out))
             
             if self._fusion in ['vanilla-ld3', 'vanilla-ld3-2', 'class-ld3', 'class-ld3-2']:
                 ratio_out = self.output(self.linear3(ratio_out))
@@ -151,6 +149,57 @@ class FusionNet(nn.Module):
         for params in self.parameters():
             params.requires_grad = unfreeze
             
+class RelNet(nn.Module):
+    
+    VALID_NET = (
+            'rel-vanilla'
+            )
+    
+    def __init__(self, net = 'rel-vanilla', use_bias = True, bn_momentum = 0.1, bn_epson = 1e-3):
+        
+        super(RelNet, self).__init__()
+        self._net = net
+        
+        assert(self._net in self.VALID_NET)
+        
+        self.relu = nn.ReLU()
+        
+        self.linear1 = nn.Linear(1024, 256, bias=use_bias)
+        self.bn1 = nn.BatchNorm1d(256, momentum=bn_momentum, eps=bn_epson)
+        
+        self.linear2 = nn.Linear(256, 64, bias=use_bias)
+        self.bn2 = nn.BatchNorm1d(64, momentum=bn_momentum, eps=bn_epson)
+        
+        self.linear3 = nn.Linear(64, 2, bias=use_bias)
+        self.output = nn.Sigmoid()
+        
+    def forward(self, y_rgb, y_flow):
+        """
+        y_rgb, y_flow <- AP, FC
+        """
+        final_out = {}
+        
+        rgb_ap = y_rgb['AP'].reshape(y_rgb['AP'].shape[:2])
+        flow_ap = y_flow['AP'].reshape(y_flow['AP'].shape[:2])
+        
+        rel_index = torch.cat((rgb_ap, flow_ap), dim = 1)
+        
+        rel_index = self.relu(self.bn1(self.linear1(rel_index)))
+        rel_index = self.relu(self.bn2(self.linear2(rel_index)))
+        rel_index = self.output(self.linear3(rel_index))
+        
+        rgb_scores = y_rgb['FC'] * rel_index[:, 0].reshape(rel_index.shape[0], 1)
+        flow_scores = y_flow['FC'] * rel_index[:, 1].reshape(rel_index.shape[0], 1)
+        
+        if self._net == 'rel-vanilla':
+            final_out['FC'] = rgb_scores + flow_scores
+        
+        final_out['INDEX'] = rel_index
+        return final_out
+    
+    def freezeAll(self, unfreeze = False):
+        for params in self.parameters():
+            params.requires_grad = unfreeze
             
 class E2EFusionNet(nn.Module):
     
@@ -182,20 +231,23 @@ class E2EFusionNet(nn.Module):
 if __name__ is '__main__':
     from train_net import mem_state
     device = torch.device('cuda:0')
-    rgb = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=3, endpoint=['AP', 'FC']).to(device)
-    flow = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=2, endpoint=['AP', 'FC']).to(device)
-    fusion = FusionNet(fusion = 'class-ld3-2', endpoint=['FC']).to(device)
     
-    model = E2EFusionNet(device, rgb, flow, fusion)
-    model.eval()
+    #rgb = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=3, endpoint=['AP', 'FC']).to(device)
+    #flow = R2Plus1DNet([3, 4, 6, 3], 101, device, in_channels=2, endpoint=['AP', 'FC']).to(device)
+    #fusion = FusionNet(fusion = 'class-ld3-2', endpoint=['FC']).to(device)
     
-    x1 = torch.randn((1, 3, 8, 112, 112)).to(device)
-    x2 = torch.randn((1, 2, 8, 112, 112)).to(device)
+    #model = E2EFusionNet(device, rgb, flow, fusion)
+    #model.eval()
     
-    with torch.set_grad_enabled(False):
-        s = model(x1, x2)
+    model = RelNet().to(device)
     
-#    x1 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
-#    x2 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
+#    x1 = torch.randn((1, 3, 8, 112, 112)).to(device)
+#    x2 = torch.randn((1, 2, 8, 112, 112)).to(device)
+    
+#    with torch.set_grad_enabled(False):
+#        s = model(x1, x2)
+    
+    x1 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
+    x2 = {'AP':torch.randn((4, 512, 1, 1, 1)).to(device), 'FC':torch.randn((4, 101)).to(device)}
 #    model = FusionNet(fusion = 'class-ld3-2', endpoint=['FC']).to(device) 
-#    s = model(x1, x2)
+    s = model(x1, x2)
