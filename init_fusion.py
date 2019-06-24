@@ -16,7 +16,7 @@ from dataset import TwoStreamDataset
 from network_r2p1d import R2Plus1DNet
 from fusion_network import FusionNet, RelNet
 from train_net import train_pref_fusion, train_relnet, save_training_model, mem_state
-from test_net import test_pref_fusion
+from test_net import test_pref_fusion, test_relnet
 
 parser = argparse.ArgumentParser(description = 'R(2+1)D Fusion Network')
 
@@ -150,8 +150,8 @@ if args.load_stream is not [] or args.load_fusion is not []:
 #        if args.fusion != 'average':
 #            assert(len(args.load_fusion) == 1)
     
-    rgb_state = torch.load(args.load_stream[0], map_location = {'cuda:3': gpu_name})['train']['best']['state_dict']
-    flow_state = torch.load(args.load_stream[1], map_location = {'cuda:3': gpu_name})['train']['best']['state_dict']
+    rgb_state = torch.load(args.load_stream[0], map_location = device)['train']['best']['state_dict']
+    flow_state = torch.load(args.load_stream[1], map_location = device)['train']['best']['state_dict']
 #        rgb_state = torch.load(args.load_stream[0])['train']['best']['model_state']
 #        flow_state = torch.load(args.load_stream[1])['train']['best']['model_state']
     
@@ -262,7 +262,11 @@ try:
                   '\n***********************************')
             
         # testing
-        all_scores, all_weights, test_acc, test_elapsed = test_pref_fusion(args, device, 
+        if not is_relnet: 
+            test_func = test_pref_fusion
+        else:
+            test_func = test_relnet
+        all_scores, all_weights, test_acc, test_elapsed = test_func(args, device, 
                                                                            {'rgb':rgbnet,'flow':flownet,'fusion':fusionnet}, 
                                                                            test_dataloader)
         

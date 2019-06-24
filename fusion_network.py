@@ -155,12 +155,23 @@ class RelNet(nn.Module):
             'rel-vanilla'
             )
     
-    def __init__(self, net = 'rel-vanilla', use_bias = True, bn_momentum = 0.1, bn_epson = 1e-3):
+    VALID_ENDPOINTS = (
+            'FC',
+            'SCORES'
+            )
+    
+    def __init__(self, net = 'rel-vanilla', use_bias = True, bn_momentum = 0.1, bn_epson = 1e-3, 
+                 endpoint = ['FC']):
         
         super(RelNet, self).__init__()
         self._net = net
         
         assert(self._net in self.VALID_NET)
+        
+        # validate list of endpoint
+        for endp in endpoint:
+            assert endp in self.VALID_ENDPOINTS
+        self._endpoint = endpoint
         
         self.relu = nn.ReLU()
         
@@ -172,6 +183,8 @@ class RelNet(nn.Module):
         
         self.linear3 = nn.Linear(64, 2, bias=use_bias)
         self.output = nn.Sigmoid()
+        
+        self.final_softmax = nn.Softmax(dim = 1)
         
     def forward(self, y_rgb, y_flow):
         """
@@ -192,7 +205,14 @@ class RelNet(nn.Module):
         flow_scores = y_flow['FC'] * rel_index[:, 1].reshape(rel_index.shape[0], 1)
         
         if self._net == 'rel-vanilla':
-            final_out['FC'] = rgb_scores + flow_scores
+            fusion_out = rgb_scores + flow_scores
+            
+        if 'FC' in self._endpoint:
+            final_out['FC'] = fusion_out
+                
+        if 'SCORES' in self._endpoint:
+            fusion_out = self.final_softmax(fusion_out)
+            final_out['SCORES'] = fusion_out
         
         final_out['INDEX'] = rel_index
         return final_out
