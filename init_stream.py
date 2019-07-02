@@ -29,6 +29,7 @@ parser.add_argument('-freeze', '--freeze_point', help = 'point where pretrained 
 parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type = float)
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
 parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
+parser.add_argument('-dropout', '--dropout', help = 'dropout ratio', default = 0, type = float)
 
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
@@ -105,7 +106,7 @@ print('\n********* LOADING MODEL ***********',
 model = R2Plus1DNet(layer_sizes[args.layer_depth], num_classes[args.dataset], device, 
                                 in_channels = in_channels[args.modality], verbose = args.verbose1, 
                                 bn_momentum = 0.1, bn_epson = 1e-3, endpoint = ['FC'], 
-                                dropout = 0).to(device)
+                                dropout = args.dropout).to(device)
 
 # load the model state that is completed training
 if args.load_model is not None:
