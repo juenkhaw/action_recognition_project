@@ -251,7 +251,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
             
         # time to save these poor guys
         # dun wanna losing them again
-        if (epoch + 1) % save_interval and args.save:
+        if (epoch + 1) % save_interval == 0 and args.save:
             
             save_training_model(args, 'train', save_content,  
                                     accuracy = accs,
