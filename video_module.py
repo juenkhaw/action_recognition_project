@@ -24,16 +24,26 @@ def temporal_crop(buffer_len, clip_len):
     if buffer_len > clip_len:
         start_index = np.random.randint(buffer_len - clip_len)
         end_index = start_index + clip_len
-    else:
+    elif buffer_len == clip_len:
         start_index = 0
-        end_index = buffer_len - 1
+        end_index = clip_len
+    else:
+        start_index = -1
+        end_index = -1
     
     return start_index, end_index
 
 def temporal_center_crop(buffer_len, clip_len):
     
-    start_index = (buffer_len - clip_len) // 2
-    end_index = start_index + clip_len
+    if buffer_len >= clip_len:
+        start_index = (buffer_len - clip_len) // 2
+        end_index = start_index + clip_len
+    elif buffer_len == clip_len:
+        start_index = 0
+        end_index = clip_len
+    else:
+        start_index = -1
+        end_index = -1
     
     return start_index, end_index
 
@@ -226,50 +236,101 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     for c in range(clips_per_video):
         
         count = t_index[c][0]
-        
-        while count < t_index[c][1]:
-            buffer_frame = []
+        if count == -1:
             
-            if frame_chn == 3:
-                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
-                buffer_frame.append(cv2.imread(path_content[0][count]))
-                buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
+            repeat = 0
+            for i in range(output_len):
                 
-            else:
-                #print(count)
-                #print(path_content[0][count])
-                #print(path_content[1][count])
-                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
-                buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
-            
-            for i in range(len(buffer_frame)):
-                
-                if buffer_frame[i] is not None:
-                
-                    # resize the frame
-                    buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
+                if i % output_len == 0 and i != 0:
+                    repeat++
                     
-                    # add channel dimension if frame is flow
-                    if modality == 'flow':
-                        buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
-                        
-                    # apply the random cropping
-                    buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
-                                 s_index[1][0] : s_index[1][1], :]
+                count = i - repeat * output_len
                 
-                    # copy to the video buffer
-                    if modality == 'rgb':
-                        np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
-                    else:
-                        np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
-                        #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
-                        
+                buffer_frame = []
+                if frame_chn == 3:
+                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
+                    buffer_frame.append(cv2.imread(path_content[0][count]))
+                    buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
+                    
                 else:
-                    print(path_content[i][count])
+                    #print(count)
+                    #print(path_content[0][count])
+                    #print(path_content[1][count])
+                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                    #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                    buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                    buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                    
+                for j in range(len(buffer_frame)):
+                    
+                    if buffer_frame[j] is not None:
+                    
+                        # resize the frame
+                        buffer_frame[j] = cv2.resize(buffer_frame[j], (scale_w, scale_h))
+                        
+                        # add channel dimension if frame is flow
+                        if modality == 'flow':
+                            buffer_frame[j] = buffer_frame[j][:, :, np.newaxis]
+                            
+                        # apply the random cropping
+                        buffer_frame[j] = buffer_frame[j][s_index[0][0] : s_index[0][1], 
+                                     s_index[1][0] : s_index[1][1], :]
+                    
+                        # copy to the video buffer
+                        if modality == 'rgb':
+                            np.copyto(buffer[c, i, :, :, :], buffer_frame[j])
+                        else:
+                            np.copyto(buffer[c, i, :, :, j], buffer_frame[j][:, :, 0])
+                            #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                            
+                    else:
+                        print(path_content[i][count])
             
-            count += 1
+        else:
+        
+            while count < t_index[c][1]:
+                buffer_frame = []
+                
+                if frame_chn == 3:
+                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
+                    buffer_frame.append(cv2.imread(path_content[0][count]))
+                    buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
+                    
+                else:
+                    #print(count)
+                    #print(path_content[0][count])
+                    #print(path_content[1][count])
+                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                    #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                    buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                    buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                
+                for i in range(len(buffer_frame)):
+                    
+                    if buffer_frame[i] is not None:
+                    
+                        # resize the frame
+                        buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
+                        
+                        # add channel dimension if frame is flow
+                        if modality == 'flow':
+                            buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
+                            
+                        # apply the random cropping
+                        buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
+                                     s_index[1][0] : s_index[1][1], :]
+                    
+                        # copy to the video buffer
+                        if modality == 'rgb':
+                            np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
+                        else:
+                            np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
+                            #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                            
+                    else:
+                        print(path_content[i][count])
+                
+                count += 1
     
     # mean substraction
     if mean_sub and modality == 'flow':
