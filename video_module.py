@@ -210,6 +210,8 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
         frame_chn = 3
     else:
         frame_chn = 2 #1
+        
+    print("TOTAL",frame_count)
     
     if mode in ['train', 'validation']:
         t_index = []
@@ -238,13 +240,14 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
         count = t_index[c][0]
         if count == -1:
             
-            repeat = 0
+            repeat = -1
             for i in range(output_len):
                 
-                if i % output_len == 0 and i != 0:
+                if i % frame_count == 0:
                     repeat = repeat + 1
                     
-                count = i - repeat * output_len
+                count = i - repeat * frame_count
+                print(count)
                 
                 buffer_frame = []
                 if frame_chn == 3:
@@ -358,17 +361,17 @@ def transpose_clip_buffer(buffer):
             
     
 if __name__ == '__main__':
-    video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_BasketballDunk_g20_c06'
-    #video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_BasketballDunk_g20_c06'
-    #video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_BasketballDunk_g20_c06'
-    #buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=True)
-    buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 8, mode = 'validation', mean_sub=False)
+    #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_HorseRiding_g14_c02'
+    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_PushUps_g16_c04'
+    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_PushUps_g16_c04'
+    buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 32, mode = 'train', mean_sub=True)
+    #buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 32, mode = 'train', mean_sub=False)
     #buffer = transpose_video_buffer(buffer)
     buffer = transpose_clip_buffer(buffer)
-    buffer0 = buffer[3, :, :, :]
-    #buffer1 = buffer[3, :, :, 1]
+    buffer0 = buffer[31, :, :, 0]
+    buffer1 = buffer[31, :, :, 1]
     #buffer0 = cv2.cvtColor(buffer0, cv2.COLOR_RGB2BGR)
     cv2.imshow('buffer0', buffer0)
-    #cv2.imshow('buffer1', buffer1)
+    cv2.imshow('buffer1', buffer1)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
