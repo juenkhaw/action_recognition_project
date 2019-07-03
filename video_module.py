@@ -242,7 +242,7 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
             for i in range(output_len):
                 
                 if i % output_len == 0 and i != 0:
-                    repeat++
+                    repeat = repeat + 1
                     
                 count = i - repeat * output_len
                 
