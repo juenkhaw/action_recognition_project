@@ -23,13 +23,10 @@ def temporal_crop(buffer_len, clip_len):
     # randomly select time index for temporal jittering
     if buffer_len > clip_len:
         start_index = np.random.randint(buffer_len - clip_len)
-        end_index = start_index + clip_len
-    elif buffer_len == clip_len:
-        start_index = 0
-        end_index = clip_len
     else:
-        start_index = -1
-        end_index = -1
+        multiplier = int(np.ceil(clip_len / buffer_len))
+        start_index = np.random.randint(buffer_len * multiplier - clip_len)
+    end_index = start_index + clip_len
     
     return start_index, end_index
 
@@ -37,13 +34,10 @@ def temporal_center_crop(buffer_len, clip_len):
     
     if buffer_len >= clip_len:
         start_index = (buffer_len - clip_len) // 2
-        end_index = start_index + clip_len
-    elif buffer_len == clip_len:
-        start_index = 0
-        end_index = clip_len
     else:
-        start_index = -1
-        end_index = -1
+        multiplier = int(np.ceil(clip_len / buffer_len))
+        start_index = (buffer_len * multiplier - clip_len) // 2
+    end_index = start_index + clip_len
     
     return start_index, end_index
 
@@ -59,16 +53,20 @@ def temporal_uniform_crop(buffer_len, clip_len, clips_per_video):
     Returns:
         indices : list of starting and ending indices of each clips
     """
+    if buffer_len < clip_len:
+        return [(-1, -1) for i in range(clips_per_video)]
     
     # compute the average spacing between each consecutive clips
     # could be negative if buffer_len < clip_len * clips_per_video
-    spacing = (buffer_len - clip_len * clips_per_video) // (clips_per_video - 1)
+    spacing = (buffer_len - clip_len * clips_per_video) / (clips_per_video - 1)
     
     indices = [(0, clip_len)]
-    for i in range(1, clips_per_video):
-        start = indices[i - 1][1] + spacing
+    for i in range(1, clips_per_video - 1):
+        start = round(indices[i - 1][1] + spacing)
         end = start + clip_len
         indices.append((start, end))
+        
+    indices.append((buffer_len - clip_len, buffer_len))
     
     return indices
 
@@ -206,13 +204,12 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     
     # retrieve frame properties
     frame_count = int(len(path_content[0]))
+    #print(frame_count)
     if modality == 'rgb':
         frame_chn = 3
     else:
         frame_chn = 2 #1
-        
-    print("TOTAL",frame_count)
-    
+            
     if mode in ['train', 'validation']:
         t_index = []
         # retrieve indices for random cropping
@@ -238,102 +235,55 @@ def load_clips(frames_path, modality, scale_h, scale_w, output_h, output_w, outp
     for c in range(clips_per_video):
         
         count = t_index[c][0]
-        if count == -1:
-            
-            repeat = -1
-            for i in range(output_len):
-                
-                if i % frame_count == 0:
-                    repeat = repeat + 1
-                    
-                count = i - repeat * frame_count
-                print(count)
-                
-                buffer_frame = []
-                if frame_chn == 3:
-                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
-                    buffer_frame.append(cv2.imread(path_content[0][count]))
-                    buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
-                    
-                else:
-                    #print(count)
-                    #print(path_content[0][count])
-                    #print(path_content[1][count])
-                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                    #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
-                    buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                    buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
-                    
-                for j in range(len(buffer_frame)):
-                    
-                    if buffer_frame[j] is not None:
-                    
-                        # resize the frame
-                        buffer_frame[j] = cv2.resize(buffer_frame[j], (scale_w, scale_h))
-                        
-                        # add channel dimension if frame is flow
-                        if modality == 'flow':
-                            buffer_frame[j] = buffer_frame[j][:, :, np.newaxis]
-                            
-                        # apply the random cropping
-                        buffer_frame[j] = buffer_frame[j][s_index[0][0] : s_index[0][1], 
-                                     s_index[1][0] : s_index[1][1], :]
-                    
-                        # copy to the video buffer
-                        if modality == 'rgb':
-                            np.copyto(buffer[c, i, :, :, :], buffer_frame[j])
-                        else:
-                            np.copyto(buffer[c, i, :, :, j], buffer_frame[j][:, :, 0])
-                            #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
-                            
-                    else:
-                        print(path_content[i][count])
-            
-        else:
         
-            while count < t_index[c][1]:
-                buffer_frame = []
+        while count < t_index[c][1]:
+            
+            ccount = count
+            while ccount >= frame_count:
+                ccount -= frame_count
                 
-                if frame_chn == 3:
-                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
-                    buffer_frame.append(cv2.imread(path_content[0][count]))
-                    buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
-                    
-                else:
-                    #print(count)
-                    #print(path_content[0][count])
-                    #print(path_content[1][count])
-                    #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                    #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
-                    buffer_frame.append(cv2.imread(path_content[0][count], cv2.IMREAD_GRAYSCALE))
-                    buffer_frame.append(cv2.imread(path_content[1][count], cv2.IMREAD_GRAYSCALE))
+            buffer_frame = []
+            
+            if frame_chn == 3:
+                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_COLOR))
+                buffer_frame.append(cv2.imread(path_content[0][ccount]))
+                buffer_frame[0] = cv2.cvtColor(buffer_frame[0], cv2.COLOR_BGR2RGB)
                 
-                for i in range(len(buffer_frame)):
+            else:
+                #print(count)
+                #print(path_content[0][count])
+                #print(path_content[1][count])
+                #buffer_frame.append(cv2.imread(frames_path[0] + '/' + path_content[0][count], cv2.IMREAD_GRAYSCALE))
+                #buffer_frame.append(cv2.imread(frames_path[1] + '/' + path_content[1][count], cv2.IMREAD_GRAYSCALE))
+                buffer_frame.append(cv2.imread(path_content[0][ccount], cv2.IMREAD_GRAYSCALE))
+                buffer_frame.append(cv2.imread(path_content[1][ccount], cv2.IMREAD_GRAYSCALE))
+            
+            for i in range(len(buffer_frame)):
+                
+                if buffer_frame[i] is not None:
+                
+                    # resize the frame
+                    buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
                     
-                    if buffer_frame[i] is not None:
-                    
-                        # resize the frame
-                        buffer_frame[i] = cv2.resize(buffer_frame[i], (scale_w, scale_h))
+                    # add channel dimension if frame is flow
+                    if modality == 'flow':
+                        buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
                         
-                        # add channel dimension if frame is flow
-                        if modality == 'flow':
-                            buffer_frame[i] = buffer_frame[i][:, :, np.newaxis]
-                            
-                        # apply the random cropping
-                        buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
-                                     s_index[1][0] : s_index[1][1], :]
-                    
-                        # copy to the video buffer
-                        if modality == 'rgb':
-                            np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
-                        else:
-                            np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
-                            #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
-                            
-                    else:
-                        print(path_content[i][count])
+                    # apply the random cropping
+                    buffer_frame[i] = buffer_frame[i][s_index[0][0] : s_index[0][1], 
+                                 s_index[1][0] : s_index[1][1], :]
                 
-                count += 1
+                    # copy to the video buffer
+                    if modality == 'rgb':
+                        np.copyto(buffer[c, count - t_index[c][0], :, :, :], buffer_frame[i])
+                    else:
+                        np.copyto(buffer[c, (count - t_index[c][0]), :, :, i], buffer_frame[i][:, :, 0])
+                        #np.copyto(buffer[c, (count - t_index[c][0]) * 2 + i, :, :, 0], buffer_frame[i][:, :, 0])
+                        
+                else:
+                    print(path_content[i][ccount])
+            
+            count += 1
     
     # mean substraction
     if mean_sub and modality == 'flow':
@@ -362,8 +312,8 @@ def transpose_clip_buffer(buffer):
     
 if __name__ == '__main__':
     #video_path = '../dataset/UCF-101/ucf101_jpegs_256/jpegs_256/v_HorseRiding_g14_c02'
-    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_PushUps_g16_c04'
-    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_PushUps_g16_c04'
+    video_path = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/u/v_HorseRiding_g14_c03'
+    video_path2 = '../dataset/UCF-101/ucf101_tvl1_flow/tvl1_flow/v/v_HorseRiding_g14_c03'
     buffer = load_clips([video_path, video_path2], 'flow', 128, 171, 112, 112, 32, mode = 'train', mean_sub=True)
     #buffer = load_clips([video_path], 'rgb', 128, 171, 112, 112, 32, mode = 'train', mean_sub=False)
     #buffer = transpose_video_buffer(buffer)

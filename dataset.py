@@ -169,6 +169,8 @@ class TwoStreamDataset(Dataset):
         return self._rgb_set.__len__()
     
 if __name__ == '__main__':
-    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = 'distributed', 
-                        test_amt = [2, 1, 0])
+    train = TwoStreamDataset('../dataset/UCF-101', 'ucf', 1, 'train', test_mode = 'none')
     trainlaoder = DataLoader(train, batch_size = 2, shuffle = True)
+    
+    for i in range(len(train._rgb_set)):
+        train.__getitem__(i)
