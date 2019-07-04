@@ -19,12 +19,15 @@ def temporal_crop(buffer_len, clip_len):
     Returns:
         start_index, end_index : starting and ending indices of the clip
     """
-    
+    sample_len = clip_len + clip_len / 2
     # randomly select time index for temporal jittering
-    if buffer_len > clip_len:
+    if buffer_len >= sample_len:
         start_index = np.random.randint(buffer_len - clip_len)
     else:
-        multiplier = int(np.ceil(clip_len / buffer_len))
+        if buffer_len != 32:
+            multiplier = int(np.ceil(sample_len / buffer_len))
+        else:
+            multiplier = 2
         start_index = np.random.randint(buffer_len * multiplier - clip_len)
     end_index = start_index + clip_len
     
