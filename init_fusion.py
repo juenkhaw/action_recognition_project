@@ -31,6 +31,8 @@ parser.add_argument('-lr', '--lr', help = 'learning rate', default = 1e-2, type 
 parser.add_argument('-momentum', '--momentum', help = 'momentum magnitude', default = 0.1, type = float)
 parser.add_argument('-l2wd', '--l2wd', help = 'L2 weight decaying regularizer', default = 1e-2, type = float)
 parser.add_argument('-wdloss', '--wdloss', help = 'Ratio applying weight diff loss', default = 0, type = float)
+# relnet only
+parser.add_argument('-omitloss', '--omitloss', help = 'Zeroes out losses for situations where both streams had wrong label', default = False, action = 'store_true')
 
 # network and optimizer settings
 parser.add_argument('-train', '--train', help = 'activate to train the model', action = 'store_true', default = False)
@@ -207,7 +209,7 @@ try:
         if not is_relnet:
             criterion = nn.CrossEntropyLoss()
         else:
-            criterion = {'fusion':nn.CrossEntropyLoss(), 'relnet':nn.MSELoss()}
+            criterion = {'fusion':nn.CrossEntropyLoss(), 'relnet':nn.MSELoss(reduction = 'none' if args.omitloss else 'mean')}
         
         if args.fusion is not 'average':
             #fusion_optimizer = optim.RMSprop(fusionnet.parameters(), lr = 1e-3, alpha = 0.9)

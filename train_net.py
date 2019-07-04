@@ -565,6 +565,7 @@ def train_relnet(args, device, models, dataloaders, optimizer, criterions, sched
             current_loss = 0
             current_rel_loss = 0
             current_correct = 0
+            current_omit = 0
             current_indexes = []
             
             if phase == 'train':
@@ -619,6 +620,11 @@ def train_relnet(args, device, models, dataloaders, optimizer, criterions, sched
                         flowy = ((torch.argmax(flow_out['FC'], dim = 1)) == sub_labels[sb]).reshape(sub_labels[sb].shape[0], 1)
                         rel_y = torch.cat([rgby, flowy], dim = 1).float()
                         
+                        # mask to zero out entry with both streams had the label wrong
+                        if args.omitloss:
+                            mask = (torch.sum(rel_y, dim = 1) > 0).reshape(sub_labels[sb].shape[0], 1).float()
+                            current_omit += (sub_labels[sb].shape[0] - torch.sum(mask))
+                        
                         if phase == 'train':
                             
                             # transforming outcome from a series of scores to a single scalar index
@@ -631,7 +637,13 @@ def train_relnet(args, device, models, dataloaders, optimizer, criterions, sched
                             # accumulate loss and true positive for the current subbatch
                             current_loss += fusion_loss.item() * sub_rgbX[sb].size(0)
                             current_correct += torch.sum(preds == sub_labels[sb].data)
-                            current_rel_loss += rel_loss.item() * rel_y.size(0)
+                            
+                            # apply omit mask, return loss as a matrix instead of a mean scalar
+                            if args.omitloss:
+                                rel_loss = torch.sum(rel_loss * mask)
+                                current_rel_loss += rel_loss
+                            else:
+                                current_rel_loss += rel_loss.item() * rel_y.size(0)
                             
                             # direct backprop in reliability network as stream is always froze
                             rel_loss.backward()
@@ -660,7 +672,10 @@ def train_relnet(args, device, models, dataloaders, optimizer, criterions, sched
                     _, preds = torch.max(outputs, 1)
                     current_correct += torch.sum(preds == labels.data)
                     
-                    current_rel_loss += criterions['relnet'](indexes, rel_y).item() * rel_y.shape[0]
+                    if args.omitloss:
+                        current_rel_loss += torch.sum(criterions['relnet'](indexes, rel_y) * mask)
+                    else:
+                        current_rel_loss += criterions['relnet'](indexes, rel_y).item() * rel_y.shape[0]
                     
                     # append the weights list
                     if epoch % index_save_interval == 0:
@@ -674,7 +689,7 @@ def train_relnet(args, device, models, dataloaders, optimizer, criterions, sched
 
             epoch_loss = current_loss / len(dataloaders[phase].dataset)
             epoch_acc = float(current_correct) / len(dataloaders[phase].dataset)
-            epoch_rel_loss = current_rel_loss / len(dataloaders[phase].dataset)
+            epoch_rel_loss = current_rel_loss / (len(dataloaders[phase].dataset) - current_omit)
             
             losses[phase].append(epoch_loss)
             accs[phase].append(epoch_acc)
