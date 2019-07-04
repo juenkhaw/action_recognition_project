@@ -126,7 +126,7 @@ def train_stream(args, device, model, dataloaders, optimizer, criterion, schedul
         losses = save_content['train']['losses']
         accs = save_content['train']['accuracy']
         prev_elapsed = save_content['train']['train_elapsed']
-        actaul_elapsed = save_content['train']['actual_elapsed']
+        actual_elapsed = save_content['train']['actual_elapsed']
         best_model = save_content['train']['best']
         
         best_model['state_dict'] = best_model['state_dict']
